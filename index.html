@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>WHITE STEP | Prototype 0.3</title>
+<title>WHITE STEP | Prototype 0.4</title>
 <style>
 *{box-sizing:border-box}
 body{margin:0;overflow:hidden;background:#111822;color:#fff;font-family:system-ui,-apple-system,sans-serif}
@@ -39,7 +39,7 @@ h1 small{letter-spacing:0;font-size:10px;font-weight:500}
 </head>
 <body>
 <div id="hud">
-  <h1>WHITE STEP <small>Ver.0.3</small></h1>
+  <h1>WHITE STEP <small>Ver.0.4</small></h1>
   <div>バランス <span id="balanceText">100%</span></div>
   <div id="bar"><div id="fill"></div></div>
   <div id="posture">重心：安定</div>
@@ -128,10 +128,14 @@ function alignLimb(mesh,top,bottom){
   mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),delta.normalize());
 }
 // The upper body reacts automatically to the legs; it cannot be controlled directly.
+// In foot-view mode, render only the legs to avoid covering the selectable shoes.
 const torsoPivot=new THREE.Group();scene.add(torsoPivot);
+const torsoOccluders=[];
 function suitPart(w,h,d,mat,x,y,z){
   const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);
-  mesh.position.set(x,y,z);mesh.castShadow=true;torsoPivot.add(mesh);return mesh;
+  mesh.position.set(x,y,z);mesh.castShadow=true;torsoPivot.add(mesh);
+  torsoOccluders.push(mesh);
+  return mesh;
 }
 suitPart(.39,.18,.23,trousers,0,.06,0);
 suitPart(.46,.54,.25,jacket,0,.38,0);
@@ -141,6 +145,23 @@ suitPart(.14,.42,.16,jacket,-.31,.32,0);
 suitPart(.14,.42,.16,jacket,.31,.32,0);
 suitPart(.105,.105,.12,skin,-.31,.06,-.008);
 suitPart(.105,.105,.12,skin,.31,.06,-.008);
+// A physical neck and head are attached to the body. The camera sits at the eyes,
+// rather than floating behind the chest as it did in the previous prototype.
+const neck=new THREE.Mesh(new THREE.CylinderGeometry(.080,.094,.19,14),skin);
+neck.position.set(0,.73,-.045);neck.castShadow=true;torsoPivot.add(neck);
+const headGroup=new THREE.Group();
+headGroup.position.set(0,.89,-.06);
+torsoPivot.add(headGroup);
+const headMesh=new THREE.Mesh(new THREE.SphereGeometry(.17,18,14),skin);
+headMesh.scale.set(.96,1.13,1);
+headMesh.castShadow=true;headGroup.add(headMesh);
+const hair=new THREE.Mesh(new THREE.SphereGeometry(.171,18,10,0,Math.PI*2,0,Math.PI*.42),material(0x23252c));
+hair.position.y=.035;headGroup.add(hair);
+const eyeAnchor=new THREE.Object3D();
+eyeAnchor.position.set(0,.035,-.18);
+headGroup.add(eyeAnchor);
+// Don't draw the player's own head/neck into the eye camera: it would obscure vision.
+neck.layers.set(1);headMesh.layers.set(1);hair.layers.set(1);
 
 const clamp=(n,min,max)=>Math.max(min,Math.min(max,n));
 const ray=new THREE.Raycaster(),pointer=new THREE.Vector2();
@@ -361,10 +382,14 @@ function animate(now){
   const base=hip();
   torsoPivot.position.set(base.x,.94+fallOffset,base.z);
   torsoPivot.rotation.set(leanZ*.92,0,-leanX*.92);
-  const head=new THREE.Vector3(base.x+leanX*.47,1.69+fallOffset,base.z+leanZ*.28+.075);
-  head.x=Math.max(head.x,WALL_FACE+.2);
-  if(initialFrame){camera.position.copy(head);initialFrame=false}
-  else camera.position.lerp(head,Math.min(1,dt*11));
+  torsoPivot.updateMatrixWorld(true);
+  const eyes=eyeAnchor.getWorldPosition(new THREE.Vector3());
+  eyes.x=Math.max(eyes.x,WALL_FACE+.2);
+  if(initialFrame){camera.position.copy(eyes);initialFrame=false}
+  else camera.position.lerp(eyes,Math.min(1,dt*11));
+  // See-through upper body when looking down: feet and shoe hit targets stay visible.
+  const footView=pitch<-.90;
+  torsoOccluders.forEach(mesh=>{mesh.visible=!footView});
   const direction=new THREE.Vector3(Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),-Math.cos(yaw)*Math.cos(pitch));
   camera.lookAt(camera.position.clone().add(direction));
   // Keep legs attached to the feet and hips (including while falling).
@@ -372,12 +397,14 @@ function animate(now){
     const foot=feet[i].clone();foot.y+=fallOffset;
     footModels[i].root.position.copy(foot);
     const high=selected===i;
+    const suggested=selected<0&&active===i&&!ended;
     const blocked=high&&feetCollide(feet[i],feet[1-i]);
-    const color=blocked?0xff5c5c:0x45ddff;
+    const color=blocked?0xff5c5c:high?0x45ddff:0x86f3a5;
     shoeMats[i].emissive.setHex(high?color:0);
     shoeMats[i].emissiveIntensity=high?.66:0;
-    footModels[i].indicator.visible=high;
+    footModels[i].indicator.visible=high||suggested;
     footModels[i].indicator.material.color.setHex(color);
+    footModels[i].indicator.material.opacity=high?.48:.28;
     const top=new THREE.Vector3(base.x+(i?.105:-.105),.97+fallOffset,base.z);
     const knee=new THREE.Vector3(top.x*.53+foot.x*.47+(i?.04:-.04),.53+fallOffset,top.z*.55+foot.z*.45-.04);
     const ankle=foot.clone();ankle.y+=.12;
