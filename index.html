@@ -1,6 +1,50 @@
 <!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>WHITE STEP | Prototype</title><style>
-*{box-sizing:border-box}body{margin:0;overflow:hidden;background:#10151b;color:#fff;font-family:system-ui,sans-serif}canvas{display:block;touch-action:none}#hud{position:fixed;top:16px;left:16px;pointer-events:none;text-shadow:0 2px 6px #000}#hud h1{font-size:23px;letter-spacing:.2em;margin:0 0 8px}#bar{height:10px;width:190px;background:#34383e;border-radius:10px;overflow:hidden;margin-top:5px}#fill{height:100%;background:#69dfaa;width:100%;transition:width .08s}#hint{font-size:12px;line-height:1.8;opacity:.85;margin-top:9px}#controls{position:fixed;right:16px;top:16px;display:flex;gap:8px}button{border:1px solid #ffffff66;background:#18212cd9;color:#fff;border-radius:10px;padding:11px 14px;font-weight:700;cursor:pointer}#msg{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:#05080dbd;text-align:center}#panel{background:#151c27;border:1px solid #ffffff33;border-radius:18px;padding:28px;max-width:350px;width:85%}#panel h2{font-size:30px;letter-spacing:.12em}#footBtns{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);display:flex;gap:10px}#footBtns button.active{background:#e4f4ff;color:#15212b}#status{position:fixed;bottom:86px;left:50%;transform:translateX(-50%);background:#10151baa;border-radius:9px;padding:8px 12px;font-size:13px;white-space:nowrap;pointer-events:none}@media(max-width:600px){#hud h1{font-size:17px}#hint{max-width:190px}#controls{top:12px;right:10px}button{padding:10px}#footBtns{bottom:12px}}
-</style></head><body><div id="hud"><h1>WHITE STEP</h1><div>バランス <span id="balanceText">100%</span></div><div id="bar"><div id="fill"></div></div><div id="hint">足をドラッグして白線上に置こう。<br>片足ずつ交互に操作。<br>右上で前方視点に切替。</div><div id="distance">進行距離 0.0m / 12m</div></div><div id="controls"><button id="view">前方を見る</button><button id="reset">やり直す</button></div><div id="status">左足をドラッグして一歩踏み出そう</div><div id="footBtns"><button id="left" class="active">左足</button><button id="right">右足</button></div><div id="msg"><div id="panel"><h2 id="result">GAME OVER</h2><p id="reason"></p><button id="retry">RETRY</button></div></div><script type="module">
+*{box-sizing:border-box}
+body{margin:0;overflow:hidden;background:#10151b;color:#fff;font-family:system-ui,sans-serif}
+canvas{display:block;touch-action:none}
+button{border:1px solid #ffffff66;background:#18212cdd;color:#fff;border-radius:10px;padding:10px 13px;font-weight:700;cursor:pointer;touch-action:none;user-select:none}
+#hud{position:fixed;top:16px;left:16px;pointer-events:none;text-shadow:0 2px 6px #000}
+#hud h1{font-size:23px;letter-spacing:.2em;margin:0 0 8px}
+#bar{height:10px;width:190px;background:#34383e;border-radius:10px;overflow:hidden;margin-top:5px}
+#fill{height:100%;background:#69dfaa;width:100%;transition:width .08s}
+#hint{font-size:12px;line-height:1.7;opacity:.9;margin-top:9px}
+#distance,#posture{margin-top:6px;font-size:13px}
+#controls{position:fixed;right:16px;top:16px;display:flex;gap:8px}
+#msg{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:#05080dc4;text-align:center;z-index:10}
+#panel{background:#151c27;border:1px solid #ffffff33;border-radius:18px;padding:28px;max-width:350px;width:85%}
+#panel h2{font-size:30px;letter-spacing:.12em}
+#footBtns{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);display:flex;gap:10px}
+#footBtns button.active{background:#e4f4ff;color:#15212b}
+#status{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#10151bbb;border-radius:9px;padding:8px 12px;font-size:13px;white-space:nowrap;pointer-events:none}
+#leanPad{position:fixed;left:16px;bottom:130px;background:#151b23b8;border:1px solid #ffffff33;border-radius:13px;padding:7px}
+#leanPad .caption{font-size:11px;text-align:center;color:#dae9f1;margin-bottom:5px}
+#leanGrid{display:grid;grid-template-columns:repeat(3,37px);grid-template-rows:repeat(3,36px);gap:3px}
+#leanGrid button{padding:0;border-radius:7px;font-size:16px}
+#leanGrid button.held{background:#e4f4ff;color:#15212b}
+#leanGrid .blank{pointer-events:none}
+@media(max-width:600px){#hud h1{font-size:17px}#hint{max-width:190px;font-size:11px}#controls{top:12px;right:10px}#controls button{padding:9px 7px;font-size:11px}#footBtns{bottom:12px}#leanPad{bottom:116px;left:8px;padding:5px}#leanGrid{grid-template-columns:repeat(3,33px);grid-template-rows:repeat(3,33px)}#status{bottom:70px;font-size:11px;max-width:95%;white-space:normal;text-align:center}}
+</style></head><body>
+<div id="hud">
+  <h1>WHITE STEP <small style="font-size:10px;letter-spacing:0">Ver.0.2</small></h1>
+  <div>バランス <span id="balanceText">100%</span></div>
+  <div id="bar"><div id="fill"></div></div>
+  <div id="posture">上半身：中央</div>
+  <div id="hint">足をドラッグして白線上へ。<br>傾きで重心を調整して立て直そう。<br>PC：W/A/S/D または矢印キー<br>スマホ：左下の矢印を長押し<br>右上で前方視点に切替。</div>
+  <div id="distance">進行距離 0.0m / 12m</div>
+</div>
+<div id="controls"><button id="view">前方を見る</button><button id="reset">やり直す</button></div>
+<div id="leanPad" aria-label="上半身の傾き操作">
+  <div class="caption">上半身を傾ける</div>
+  <div id="leanGrid">
+    <span class="blank"></span><button data-lean="forward" aria-label="前に傾ける">↑</button><span class="blank"></span>
+    <button data-lean="left" aria-label="左に傾ける">←</button><span class="blank"></span><button data-lean="right" aria-label="右に傾ける">→</button>
+    <span class="blank"></span><button data-lean="back" aria-label="後ろに傾ける">↓</button><span class="blank"></span>
+  </div>
+</div>
+<div id="status">左足をドラッグして一歩踏み出そう</div>
+<div id="footBtns"><button id="left" class="active">左足</button><button id="right">右足</button></div>
+<div id="msg"><div id="panel"><h2 id="result">GAME OVER</h2><p id="reason"></p><button id="retry">RETRY</button></div></div>
+<script type="module">
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js';
 const scene=new THREE.Scene();scene.background=new THREE.Color(0xa9c3d4);scene.fog=new THREE.Fog(0xa9c3d4,20,90);
 const camera=new THREE.PerspectiveCamera(72,innerWidth/innerHeight,.05,120);const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.shadowMap.enabled=true;document.body.prepend(renderer.domElement);
@@ -10,23 +54,210 @@ function box(w,h,d,m,x,y,z){const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),
 // Road is VISUAL ONLY. Only the white stripe is collidable.
 box(13,.04,75,asphalt,0,-.045,-22);box(.27,.018,40,white,0,.005,-18);for(let i=0;i<14;i++){let z=3-i*5;box(3,.15,4,mat(i%2?0x8a969b:0x9faab0),-8,-.09,z);box(3,.15,4,mat(i%2?0x8a969b:0x9faab0),8,-.09,z)}
 for(let i=0;i<12;i++){let z=-i*6-3;let h=4+(i%4)*1.4;box(4,h,4,mat(i%2?0x8196a4:0xa5adb5),-10,h/2-.1,z);box(4,h+1,4,mat(i%2?0x8b9199:0xb5aaa0),10,(h+1)/2-.1,z)}
-const footMeshes=[];for(let i=0;i<2;i++){let root=new THREE.Group();const shoe=new THREE.Mesh(new THREE.BoxGeometry(.19,.12,.38),shoeMat);shoe.position.z=-.08;shoe.castShadow=true;root.add(shoe);const toe=new THREE.Mesh(new THREE.SphereGeometry(.096,10,8),shoeMat);toe.scale.set(1,.6,1.2);toe.position.set(0,0,-.26);root.add(toe);scene.add(root);footMeshes.push(root)}
-const legs=[];for(let i=0;i<2;i++){let leg=new THREE.Mesh(new THREE.CylinderGeometry(.105,.075,1,10),pant);scene.add(leg);legs.push(leg)}
-let feet,active,dragging=false,look=false,ended=false,stability=100,fallY=0,velocity=0,progress=0,prevX=0,prevY=0,dragSpeed=0;const ray=new THREE.Raycaster();const pointer=new THREE.Vector2();const ground=new THREE.Plane(new THREE.Vector3(0,1,0),-.0);const target=new THREE.Vector3();let startFoot=null;
-const status=document.getElementById('status');function reset(){feet=[new THREE.Vector3(-.075,.09,.25),new THREE.Vector3(.075,.09,.55)];active=0;dragging=false;look=false;ended=false;stability=100;fallY=0;velocity=0;progress=0;document.getElementById('msg').style.display='none';document.getElementById('view').textContent='前方を見る';updateButtons()}
+// Shoes and articulated legs.
+const footMeshes=[];
+for(let i=0;i<2;i++){
+  const foot=new THREE.Group();
+  const shoe=new THREE.Mesh(new THREE.BoxGeometry(.19,.12,.38),shoeMat);
+  shoe.position.z=-.08;shoe.castShadow=true;foot.add(shoe);
+  const toe=new THREE.Mesh(new THREE.SphereGeometry(.096,10,8),shoeMat);
+  toe.scale.set(1,.6,1.2);toe.position.set(0,0,-.26);foot.add(toe);
+  scene.add(foot);footMeshes.push(foot);
+}
+const legs=Array.from({length:2},()=>[0,1].map(part=>{
+  const mesh=new THREE.Mesh(new THREE.CylinderGeometry(part? .087:.115,part? .07:.085,1,12),pant);
+  mesh.castShadow=true;scene.add(mesh);return mesh;
+}));
+function setLimb(mesh,start,end){
+  const delta=end.clone().sub(start);
+  mesh.position.copy(start).add(end).multiplyScalar(.5);
+  mesh.scale.set(1,delta.length(),1);
+  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),delta.normalize());
+}
+// A first-person torso. The head is intentionally omitted so it cannot block the camera.
+const jacket=mat(0x283345),shirt=mat(0xe5e9ec),tie=mat(0x8f2834),skin=mat(0xc79d81);
+const torsoPivot=new THREE.Group();scene.add(torsoPivot);
+function torsoPart(w,h,d,m,x,y,z,parent=torsoPivot){
+  const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);
+  mesh.position.set(x,y,z);mesh.castShadow=true;parent.add(mesh);return mesh;
+}
+torsoPart(.39,.18,.23,pant,0,.06,0); // waist
+torsoPart(.47,.53,.25,jacket,0,.38,0);
+torsoPart(.16,.44,.021,shirt,0,.38,-.136);
+torsoPart(.055,.34,.026,tie,0,.37,-.153);
+torsoPart(.14,.42,.17,jacket,-.31,.32,.005);
+torsoPart(.14,.42,.17,jacket,.31,.32,.005);
+torsoPart(.11,.10,.13,skin,-.31,.06,-.015);
+torsoPart(.11,.10,.13,skin,.31,.06,-.015);
+
+let feet,active,dragging=false,look=false,ended=false,stability=100,fallY=0,velocity=0;
+let progress=0,prevX=0,prevY=0,dragSpeed=0,leanX=0,leanZ=0,collapseTime=0;
+let lastFrame=performance.now();
+const ray=new THREE.Raycaster(),pointer=new THREE.Vector2();
+const ground=new THREE.Plane(new THREE.Vector3(0,1,0),0),target=new THREE.Vector3();
+const keys=new Set(),touchLeans=new Set(),status=document.getElementById('status');
+const clamp=(n,min,max)=>Math.max(min,Math.min(max,n));
+function hipPosition(){
+  return new THREE.Vector3((feet[0].x+feet[1].x)/2,1.01,(feet[0].z+feet[1].z)/2+.13);
+}
+function reset(){
+  feet=[new THREE.Vector3(-.075,.09,.25),new THREE.Vector3(.075,.09,.55)];
+  active=0;dragging=false;look=false;ended=false;stability=100;fallY=0;velocity=0;
+  progress=0;dragSpeed=0;leanX=0;leanZ=0;collapseTime=0;keys.clear();touchLeans.clear();
+  document.querySelectorAll('[data-lean]').forEach(b=>b.classList.remove('held'));
+  document.getElementById('msg').style.display='none';
+  document.getElementById('view').textContent='前方を見る';
+  status.textContent='左足をドラッグして一歩踏み出そう';
+  updateButtons();
+}
 function updateButtons(){document.getElementById('left').classList.toggle('active',active===0);document.getElementById('right').classList.toggle('active',active===1)}
 function finish(win,why){ended=true;dragging=false;document.getElementById('msg').style.display='flex';document.getElementById('result').textContent=win?'PROTOTYPE CLEAR':'GAME OVER';document.getElementById('reason').textContent=why}
 function worldAt(e){pointer.x=e.clientX/innerWidth*2-1;pointer.y=-(e.clientY/innerHeight)*2+1;ray.setFromCamera(pointer,camera);return ray.ray.intersectPlane(ground,target)?target.clone():null}
-function onDown(e){if(ended||look)return;const p=worldAt(e);if(!p)return;const f=feet[active];if(Math.hypot(p.x-f.x,p.z-f.z)>.9)return;dragging=true;startFoot=f.clone();dragSpeed=0;prevX=e.clientX;prevY=e.clientY;renderer.domElement.setPointerCapture(e.pointerId)}
-function onMove(e){if(!dragging||ended)return;const p=worldAt(e);if(!p)return;const f=feet[active],anchor=feet[1-active];const dx=p.x-anchor.x,dz=p.z-anchor.z;const len=Math.hypot(dx,dz);const max=1.05;f.x=anchor.x+dx*Math.min(1,max/Math.max(.001,len));f.z=anchor.z+dz*Math.min(1,max/Math.max(.001,len));f.y=.28;dragSpeed=Math.min(1.5,dragSpeed*.65+Math.hypot(e.clientX-prevX,e.clientY-prevY)/75);prevX=e.clientX;prevY=e.clientY;}
-function onUp(){if(!dragging||ended)return;dragging=false;let f=feet[active];f.y=.09;const anchor=feet[1-active];const span=Math.hypot(f.x-anchor.x,f.z-anchor.z);const crossing=(active===0?f.x>anchor.x+.08:f.x<anchor.x-.08);const strain=Math.max(0,span-.53)*48+(crossing?23:0)+dragSpeed*10;stability=Math.max(0,stability-strain);if(Math.abs(f.x)>.135){finish(false,'白線を踏み外した！');return}if(stability<=12){finish(false,'バランスを崩して転落した！');return}progress=Math.max(progress,-Math.min(feet[0].z,feet[1].z));if(progress>=12){finish(true,'12mの白線を渡りきった！');return}active=1-active;updateButtons();status.textContent=(active===0?'左足':'右足')+'をドラッグして次の一歩へ'}
+function onDown(e){
+  if(ended||look)return;
+  const p=worldAt(e);if(!p)return;
+  const f=feet[active];
+  if(Math.hypot(p.x-f.x,p.z-f.z)>.9)return;
+  dragging=true;dragSpeed=0;prevX=e.clientX;prevY=e.clientY;
+  renderer.domElement.setPointerCapture(e.pointerId);
+}
+function onMove(e){
+  if(!dragging||ended)return;
+  const p=worldAt(e);if(!p)return;
+  const f=feet[active],anchor=feet[1-active],dx=p.x-anchor.x,dz=p.z-anchor.z;
+  const span=Math.hypot(dx,dz),reach=Math.min(1,1.08/Math.max(.001,span));
+  f.x=anchor.x+dx*reach;f.z=anchor.z+dz*reach;f.y=.28;
+  dragSpeed=Math.min(1.6,dragSpeed*.65+Math.hypot(e.clientX-prevX,e.clientY-prevY)/75);
+  prevX=e.clientX;prevY=e.clientY;
+}
+function onUp(){
+  if(!dragging||ended)return;
+  dragging=false;
+  const foot=feet[active];foot.y=.09;dragSpeed*=.35;
+  if(Math.abs(foot.x)>.135){finish(false,'白線を踏み外し、道路をすり抜けた！');return}
+  progress=Math.max(progress,-Math.min(feet[0].z,feet[1].z));
+  if(progress>=12){finish(true,'12mの白線を渡りきった！');return}
+  active=1-active;updateButtons();
+  status.textContent=(active===0?'左足':'右足')+'を動かそう。崩れた姿勢も次の一歩で修正できる！';
+}
 renderer.domElement.addEventListener('pointerdown',onDown);renderer.domElement.addEventListener('pointermove',onMove);renderer.domElement.addEventListener('pointerup',onUp);renderer.domElement.addEventListener('pointercancel',onUp);
-document.getElementById('view').onclick=()=>{if(ended)return;look=!look;dragging=false;document.getElementById('view').textContent=look?'足元に戻る':'前方を見る';status.textContent=look?'前方を確認中':'足をドラッグして進もう'};document.getElementById('reset').onclick=reset;document.getElementById('retry').onclick=reset;
+document.getElementById('view').onclick=()=>{
+  if(ended)return;
+  if(dragging)onUp();
+  if(ended)return;
+  look=!look;
+  document.getElementById('view').textContent=look?'足元に戻る':'前方を見る';
+  status.textContent=look?'前方を確認中':'足をドラッグして進もう';
+};
+document.getElementById('reset').onclick=reset;
+document.getElementById('retry').onclick=reset;
 document.getElementById('left').onclick=()=>{if(!dragging&&!ended){active=0;updateButtons()}};document.getElementById('right').onclick=()=>{if(!dragging&&!ended){active=1;updateButtons()}};
-function animate(){requestAnimationFrame(animate);const hip=new THREE.Vector3((feet[0].x+feet[1].x)/2,1.06,(feet[0].z+feet[1].z)/2+.15);if(ended&&document.getElementById('result').textContent==='GAME OVER'){velocity+=.006;fallY-=velocity}const tilt=(feet[0].x+feet[1].x)*.3+(100-stability)*.002;const desired=new THREE.Vector3(hip.x+tilt,look?1.72:1.58,hip.z+(look?.5:1.0));desired.y+=fallY;camera.position.lerp(desired,.1);const aim=look?new THREE.Vector3(hip.x,1.45,hip.z-10):new THREE.Vector3(hip.x,0,hip.z-.65);aim.y+=fallY;camera.lookAt(aim);
-for(let i=0;i<2;i++){footMeshes[i].position.copy(feet[i]);footMeshes[i].position.y+=fallY;const knee=new THREE.Vector3((hip.x+feet[i].x)/2+(i? .07:-.07),.58+fallY,(hip.z+feet[i].z)/2-.06);const ankle=feet[i].clone();ankle.y+=fallY+.12;const mid=knee.clone().add(ankle).multiplyScalar(.5);legs[i].position.copy(mid);const delta=knee.clone().sub(ankle);legs[i].scale.set(1,delta.length(),1);legs[i].quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),delta.normalize())}
-// Gradual instability: planted foot slips if strained, rather than random drift.
-if(dragging&&!ended){const f=feet[active],a=feet[1-active];const span=Math.hypot(f.x-a.x,f.z-a.z);const excess=Math.max(0,span-.78);stability=Math.max(0,stability-excess*.3-dragSpeed*.015);if(excess>.12){a.x+=(f.x-a.x)*.0007;a.z+=(f.z-a.z)*.0007}if(Math.abs(a.x)>.135||stability<=12)finish(false,'軸足が滑り、バランスを失った！')}
-if(!dragging&&!ended)stability=Math.min(100,stability+.012);document.getElementById('balanceText').textContent=Math.round(stability)+'%';document.getElementById('fill').style.width=stability+'%';document.getElementById('fill').style.background=stability<35?'#f16e6e':stability<65?'#edbf62':'#69dfaa';document.getElementById('distance').textContent='進行距離 '+progress.toFixed(1)+'m / 12m';renderer.render(scene,camera)}
-addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});reset();animate();
+const leanKeys={
+  KeyA:'left',ArrowLeft:'left',KeyD:'right',ArrowRight:'right',
+  KeyW:'forward',ArrowUp:'forward',KeyS:'back',ArrowDown:'back'
+};
+addEventListener('keydown',e=>{if(leanKeys[e.code]){keys.add(e.code);e.preventDefault()}});
+addEventListener('keyup',e=>{keys.delete(e.code)});
+addEventListener('blur',()=>{keys.clear();touchLeans.clear();document.querySelectorAll('[data-lean]').forEach(b=>b.classList.remove('held'))});
+document.querySelectorAll('[data-lean]').forEach(button=>{
+  const direction=button.dataset.lean;
+  button.addEventListener('pointerdown',e=>{
+    e.preventDefault();touchLeans.add(direction);button.classList.add('held');
+    button.setPointerCapture(e.pointerId);
+  });
+  function release(){touchLeans.delete(direction);button.classList.remove('held')}
+  button.addEventListener('pointerup',release);
+  button.addEventListener('pointercancel',release);
+  button.addEventListener('lostpointercapture',release);
+});
+function held(direction){
+  return touchLeans.has(direction)||[...keys].some(key=>leanKeys[key]===direction);
+}
+function updateLean(dt){
+  const x=(held('right')?1:0)-(held('left')?1:0);
+  const z=(held('back')?1:0)-(held('forward')?1:0);
+  const planted=feet[1-active],moving=feet[active];
+  // The torso reflexively shifts a little toward the supporting foot.
+  const reflexX=dragging?(planted.x-moving.x)*.12:0;
+  const reflexZ=dragging?(planted.z-moving.z)*.12:0;
+  leanX+=(clamp(x*.40+reflexX,-.46,.46)-leanX)*Math.min(1,dt*6);
+  leanZ+=(clamp(z*.40+reflexZ,-.46,.46)-leanZ)*Math.min(1,dt*6);
+}
+function balanceTarget(){
+  const hip=hipPosition(),span=feet[0].distanceTo(feet[1]);
+  const support=dragging?feet[1-active]:feet[0].clone().add(feet[1]).multiplyScalar(.5);
+  // Project the upper-body center of mass over the planted foot/stance.
+  const comX=hip.x+leanX*.40,comZ=hip.z+leanZ*.40;
+  const lateral=Math.abs(comX-support.x),frontBack=Math.abs(comZ-support.z);
+  const sidePenalty=Math.max(0,lateral-.035)/(dragging?.12:.16)*26;
+  const depthPenalty=Math.max(0,frontBack-.08)/(dragging?.25:.47)*29;
+  const stepPenalty=Math.max(0,span-.56)*(dragging?46:31);
+  const crossing=feet[0].x>feet[1].x+.035;
+  const crossPenalty=crossing?38:0;
+  const motionPenalty=dragging?dragSpeed*10:0;
+  const torsoPenalty=Math.max(0,Math.hypot(leanX,leanZ)-.42)*20;
+  return {target:clamp(100-sidePenalty-depthPenalty-stepPenalty-crossPenalty-motionPenalty-torsoPenalty-(dragging?7:0),0,100),comX,comZ,span};
+}
+function updateBalance(dt){
+  if(ended)return;
+  const posture=balanceTarget();
+  // Recover rapidly when the NEXT STEP or an upper-body adjustment improves the pose.
+  const responsiveness=posture.target>stability?7.5:5.5;
+  stability+=(posture.target-stability)*Math.min(1,dt*responsiveness);
+  if(stability<16)collapseTime+=dt;
+  else collapseTime=Math.max(0,collapseTime-dt*2);
+  if(collapseTime>.75){finish(false,'重心が足場から外れ、姿勢を立て直せなかった！');return}
+  // The support foot stays planted unless the body is very unstable.
+  if(dragging&&stability<35){
+    const support=feet[1-active],slip=dt*(35-stability)/35*.11;
+    support.x+=(posture.comX-support.x)*slip;
+    support.z+=(posture.comZ-support.z)*slip;
+    if(Math.abs(support.x)>.135)finish(false,'軸足が滑って白線から落ちた！');
+  }
+}
+function animate(now){
+  requestAnimationFrame(animate);
+  const dt=Math.min(.05,(now-lastFrame)/1000||1/60);lastFrame=now;
+  dragSpeed*=Math.pow(.82,dt*60);
+  if(!ended){updateLean(dt);updateBalance(dt)}
+  const hip=hipPosition();
+  if(ended&&document.getElementById('result').textContent==='GAME OVER'){
+    velocity+=9.8*dt;fallY-=velocity*dt;
+  }
+  torsoPivot.position.set(hip.x,.94+fallY,hip.z);
+  torsoPivot.rotation.set(leanZ*.90,0,-leanX*.90);
+  const desired=new THREE.Vector3(hip.x+leanX*.23,look?1.72:1.60,hip.z+(look?.45:.95));
+  desired.y+=fallY;
+  camera.position.lerp(desired,Math.min(1,dt*7));
+  const aim=look
+    ?new THREE.Vector3(hip.x+leanX*.12,1.42,hip.z-10)
+    :new THREE.Vector3(hip.x+leanX*.12,.10,hip.z-.64);
+  aim.y+=fallY;camera.lookAt(aim);
+  for(let i=0;i<2;i++){
+    const foot=feet[i].clone();foot.y+=fallY;
+    footMeshes[i].position.copy(foot);
+    const thighTop=new THREE.Vector3(hip.x+(i? .11:-.11),.97+fallY,hip.z);
+    const knee=new THREE.Vector3(
+      thighTop.x*.55+foot.x*.45+(i?.045:-.045),
+      .52+fallY,
+      thighTop.z*.51+foot.z*.49-.04
+    );
+    const ankle=foot.clone();ankle.y+=.12;
+    setLimb(legs[i][0],thighTop,knee);
+    setLimb(legs[i][1],knee,ankle);
+  }
+  const percent=Math.round(stability);
+  document.getElementById('balanceText').textContent=percent+'%';
+  document.getElementById('fill').style.width=percent+'%';
+  document.getElementById('fill').style.background=stability<35?'#f16e6e':stability<65?'#edbf62':'#69dfaa';
+  const direction=Math.abs(leanX)<.08?'中央':leanX>0?'右':'左';
+  const depth=Math.abs(leanZ)<.08?'':leanZ>0?'・後ろ':'・前';
+  document.getElementById('posture').textContent='上半身：'+direction+depth+(stability<35?' ⚠ 立て直そう！':'');
+  document.getElementById('distance').textContent='進行距離 '+progress.toFixed(1)+'m / 12m';
+  renderer.render(scene,camera);
+}
+addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);
+});
+reset();requestAnimationFrame(animate);
 </script></body></html>
