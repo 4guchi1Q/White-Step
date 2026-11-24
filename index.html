@@ -42,7 +42,7 @@ h1 small{letter-spacing:0;font-size:10px;font-weight:500}
 </head>
 <body>
 <div id="hud">
-  <h1>WHITE STEP <small>Ver.0.9.3 DEBUG</small></h1>
+  <h1>WHITE STEP <small>Ver.0.9.4 DEBUG</small></h1>
   
   
   
@@ -71,7 +71,7 @@ function fail(e){failed=true;log('ERROR ['+stage+'] '+(e&&e.message?e.name+": "+
 window.wsDebug={mark:mark,fail:fail,low:low,frame:function(){frames++;if(frames===1)mark('First render OK');if(frames===60)log('60 frames OK');}};
 window.addEventListener('error',function(e){fail(e.error||e.message||('Resource error: '+(e.target.src||e.target.tagName)));},true);
 window.addEventListener('unhandledrejection',function(e){fail(e.reason);});
-log('White Step 0.9.3 DEBUG / '+(low?'LOW':'NORMAL'));log(navigator.userAgent);log('Screen '+innerWidth+'x'+innerHeight+' DPR '+devicePixelRatio);mark('Waiting for Three.js');
+log('White Step 0.9.4 DEBUG / '+(low?'LOW':'NORMAL'));log(navigator.userAgent);log('Screen '+innerWidth+'x'+innerHeight+' DPR '+devicePixelRatio);mark('Waiting for Three.js');
 setTimeout(function(){if(!frames&&!failed){log('TIMEOUT: no first render; last stage = '+stage);out.hidden=false;};},12000);
 document.getElementById('wsToggle').onclick=function(){out.hidden=!out.hidden;this.textContent=out.hidden?'ログを表示':'ログを隠す';};
 document.getElementById('wsCopy').onclick=async function(){try{await navigator.clipboard.writeText(lines.join('\n'));this.textContent='コピー済み';}catch(e){log('Copy failed: '+e.message);}};
@@ -89,7 +89,7 @@ D.mark('Loading Rapier physics');
 const R=(await import('https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.17.3/+esm')).default;
 await R.init();
 D.mark('Rapier initialized');
-let world,rig,shoeBodies=[],accumulator=0,held=-1;
+let world,rig,shoeBodies=[],ropes=[],fallLegs=[],accumulator=0,held=-1;
 
 
 const scene = new THREE.Scene();
@@ -273,13 +273,19 @@ let leanX,leanZ,wallContactTime,wallAssist;
 let footV,fallX,fallZ,fallVX,fallVZ,fallRoll,fallSpin;
 let checkpointReached=false,checkpointFeet=null,pedestrianGreen=false,trafficGreen=true;
 let yaw=0,pitch=-1.31,lastFrame=performance.now(),elapsed=0,initialFrame=true;
+const routeGuide=new THREE.Group();scene.add(routeGuide);
+const guideMat=new THREE.MeshBasicMaterial({color:0xffd34e,depthTest:false,transparent:true,opacity:.9});
+for(let i=0;i<7;i++){const m=new THREE.Mesh(new THREE.BoxGeometry(.045,.008,.12),guideMat);m.position.z=-.16*i;routeGuide.add(m);}
+for(const sign of [-1,1]){const m=new THREE.Mesh(new THREE.BoxGeometry(.045,.008,.22),guideMat);m.position.set(sign*.065,0,-1.04);m.rotation.y=sign*.65;routeGuide.add(m);}
+routeGuide.traverse(m=>m.renderOrder=10);
+function routeYaw(p){return p.x>FAR_X-.30?0:(p.x>.30||p.z<CROSS_Z+.55?-Math.PI/2:0);}
 function hip(){
   if(rig){const t=rig.translation(),q=rig.rotation();return new THREE.Vector3(0,-.35,0).applyQuaternion(new THREE.Quaternion(q.x,q.y,q.z,q.w)).add(new THREE.Vector3(t.x,t.y,t.z));}
   return new THREE.Vector3((feet[0].x+feet[1].x)/2,1,(feet[0].z+feet[1].z)/2);
 }
 function initPhysics(){
   if(world)world.free();
-  world=new R.World({x:0,y:-9.81,z:0});world.timestep=1/120;accumulator=0;held=-1;
+  ropes=[];fallLegs=[];world=new R.World({x:0,y:-9.81,z:0});world.timestep=1/120;accumulator=0;held=-1;
   const fixed=(x,y,z,w,h,d)=>world.createCollider(R.ColliderDesc.cuboid(w/2,h/2,d/2).setTranslation(x,y,z).setFriction(.85));
   fixed(0,-.136,-14.5,.27,.32,39);fixed(FAR_X,-.136,-14.5,.27,.32,39);
   for(const x of CROSS_XS)fixed(x,-.136,CROSS_Z,.42,.32,CROSS_HALF_Z*2);
@@ -291,16 +297,34 @@ function initPhysics(){
   world.createCollider(R.ColliderDesc.ball(.17).setTranslation(0,.54,-.06).setMass(5),rig);
   for(let i=0;i<2;i++){
     const joint=world.createImpulseJoint(R.JointData.rope(.98,{x:i?.105:-.105,y:-.35,z:0},{x:0,y:.12,z:0}),rig,shoeBodies[i],true);
-    joint.setContactsEnabled(false);
+    joint.setContactsEnabled(false);ropes.push(joint);
   }
 }
 let mode='stable', unstableAge=0;
 const upright=()=>new THREE.Quaternion();
 function pin(b,p,q){b.setBodyType(R.RigidBodyType.KinematicPositionBased,true);b.setTranslation(p,true);b.setRotation(q,true);b.setNextKinematicTranslation(p);b.setNextKinematicRotation(q);}
 function free(b){if(b.bodyType()!==R.RigidBodyType.Dynamic)b.setBodyType(R.RigidBodyType.Dynamic,true);}
+function vec(p){return new THREE.Vector3(p.x,p.y,p.z)}
+function quat(b){const q=b.rotation();return new THREE.Quaternion(q.x,q.y,q.z,q.w)}
+function local(b,p){return p.clone().sub(vec(b.translation())).applyQuaternion(quat(b).invert())}
+function connect(a,b,p){const j=world.createImpulseJoint(R.JointData.spherical(local(a,p),local(b,p)),a,b,true);j.setContactsEnabled(false);}
+function beginRagdoll(){
+  ropes.forEach(j=>world.removeImpulseJoint(j,true));ropes=[];
+  const q=quat(rig),center=vec(rig.translation()),v=rig.linvel();
+  const bad=feet[0].y<feet[1].y?0:1,delta=feet[bad].clone().sub(center);delta.y=0;
+  if(delta.length()>.02){delta.normalize();rig.applyImpulse({x:delta.x*5,y:0,z:delta.z*5},true);}
+  for(let i=0;i<2;i++){
+    const top=new THREE.Vector3(i?.105:-.105,-.32,0).applyQuaternion(q).add(center);
+    const ankle=new THREE.Vector3(0,.12,0).applyQuaternion(quat(shoeBodies[i])).add(vec(shoeBodies[i].translation()));
+    const axis=ankle.clone().sub(top),dir=axis.clone().normalize(),bend=new THREE.Vector3(0,0,-1).applyQuaternion(q);bend.addScaledVector(dir,-bend.dot(dir));if(bend.lengthSq()<.001)bend.set(1,0,0);
+    const knee=top.clone().add(ankle).multiplyScalar(.5).addScaledVector(bend.normalize(),Math.sqrt(Math.max(0,.49*.49-axis.lengthSq()/4)));
+    const parts=[[top,knee],[knee,ankle]].map(([a,b],j)=>{const d=b.clone().sub(a),m=a.clone().add(b).multiplyScalar(.5),rot=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),d.clone().normalize());const rb=world.createRigidBody(R.RigidBodyDesc.dynamic().setTranslation(m.x,m.y,m.z).setRotation(rot).setLinvel(v.x,v.y,v.z).setCcdEnabled(true).setAngularDamping(1));const len=Math.max(.05,d.length());world.createCollider(R.ColliderDesc.capsule(Math.max(.01,len/2-.07),j?.073:.085).setMass(j?4:7).setFriction(.65),rb);return {rb,len};});
+    connect(rig,parts[0].rb,top);connect(parts[0].rb,parts[1].rb,knee);connect(parts[1].rb,shoeBodies[i],ankle);fallLegs.push(parts);
+  }
+}
 function physicsStep(dt){
   const active=dragging&&!ended?selected:-1;
-  const good=feet.map((f,i)=>support(f,i)>=.72&&safePaint({x:f.x,z:f.z-.10})&&f.y>=.035&&f.y<=.32);
+  const good=feet.map((f,i)=>support(f,i)>=.72&&safePaint({x:f.x-.10*Math.sin(footYaw[i]),z:f.z-.10*Math.cos(footYaw[i])})&&f.y>=.035&&f.y<=.32);
   const t=rig.translation(),q=rig.rotation();
   const up=new THREE.Vector3(0,1,0).applyQuaternion(new THREE.Quaternion(q.x,q.y,q.z,q.w));
   const recover=up.y>.48&&t.y>.80;
@@ -330,7 +354,7 @@ function physicsStep(dt){
   while(accumulator>=1/120){world.step();accumulator-=1/120;}
   shoeBodies.forEach((b,i)=>{if(i!==active){const p=b.translation();feet[i].set(p.x,p.y,p.z);}});
   const r=rig.rotation(),u=new THREE.Vector3(0,1,0).applyQuaternion(new THREE.Quaternion(r.x,r.y,r.z,r.w));
-  if(!ended&&(rig.translation().y<.52||u.y<.12||feet.every(f=>f.y<-.48))){mode='fall';rig.setGravityScale(1,true);shoeBodies.forEach(b=>{free(b);b.setGravityScale(1,true);});showResult(false,'足場を失った！');}
+  if(!ended&&(rig.translation().y<.52||u.y<.12||feet.every(f=>f.y<-.48))){mode='fall';rig.setGravityScale(1,true);shoeBodies.forEach(b=>{free(b);b.setGravityScale(1,true);});beginRagdoll();showResult(false,'足場を失った！');}
 }
 function reset(fromCheckpoint=false){
   const resume=fromCheckpoint===true&&checkpointReached&&checkpointFeet;
@@ -422,7 +446,7 @@ function onPointerMove(e){
   const offX=wantedX-anchor.x,offZ=wantedZ-anchor.z;
   const reach=Math.min(1,1.08/Math.max(.001,Math.hypot(offX,offZ)));
   feet[selected].set(anchor.x+offX*reach,.30,anchor.z+offZ*reach);
-  footYaw[selected]=-yaw;
+  footYaw[selected]=routeYaw(feet[selected]);
   dragSpeed=clamp(dragSpeed*.55+Math.hypot(dx,dy)/95,0,1.8);
   if(feetCollide(feet[selected],anchor)){
     status.textContent='足同士が重なっている！ この位置には着地できない';
@@ -527,6 +551,7 @@ function animate(now){
     if(overlayDelay>(isWin?.85:2.0))document.getElementById('message').style.display='flex';
   }
   const base=hip();
+  routeGuide.visible=!ended;const guidePos=feet[0].clone().add(feet[1]).multiplyScalar(.5);routeGuide.position.set(guidePos.x,.045,guidePos.z);routeGuide.rotation.y=routeYaw(guidePos);
   torsoPivot.position.copy(base);
   const rq=rig.rotation();torsoPivot.quaternion.set(rq.x,rq.y,rq.z,rq.w);
   arms.forEach((a,i)=>{a.rotation.z=ended&&!isWin?(i?1:-1)*(1.6+.45*Math.sin(overlayDelay*15)):0;a.rotation.x=ended&&!isWin?.6*Math.sin(overlayDelay*12+i):0;});
@@ -562,6 +587,7 @@ function animate(now){
     const mid=top.clone().add(ankle).multiplyScalar(.5);
     const bend=new THREE.Vector3(0,0,-1);const dir=ankle.clone().sub(top).normalize();bend.addScaledVector(dir,-bend.dot(dir));if(bend.lengthSq()<.001)bend.set(1,0,0);
     const knee=mid.add(bend.normalize().multiplyScalar(Math.sqrt(Math.max(0,.49*.49-top.distanceToSquared(ankle)/4))));
+    if(fallLegs[i]){fallLegs[i].forEach(({rb,len},j)=>{const m=limbs[i][j];m.position.copy(vec(rb.translation()));m.quaternion.copy(quat(rb));m.scale.set(1,len,1);});continue;}
     alignLimb(limbs[i][0],top,knee);
     alignLimb(limbs[i][1],knee,ankle);
   }
