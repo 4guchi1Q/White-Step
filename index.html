@@ -42,7 +42,7 @@ h1 small{letter-spacing:0;font-size:10px;font-weight:500}
 </head>
 <body>
 <div id="hud">
-  <h1>WHITE STEP <small>Ver.0.7 DEBUG</small></h1>
+  <h1>WHITE STEP <small>Ver.0.8 DEBUG</small></h1>
   <div>バランス <span id="balanceText">100%</span></div>
   <div id="bar"><div id="fill"></div></div>
   <div id="posture">重心：安定</div>
@@ -71,7 +71,7 @@ function fail(e){failed=true;log('ERROR ['+stage+'] '+(e&&e.message?e.name+": "+
 window.wsDebug={mark:mark,fail:fail,low:low,frame:function(){frames++;if(frames===1)mark('First render OK');if(frames===60)log('60 frames OK');}};
 window.addEventListener('error',function(e){fail(e.error||e.message||('Resource error: '+(e.target.src||e.target.tagName)));},true);
 window.addEventListener('unhandledrejection',function(e){fail(e.reason);});
-log('White Step 0.7 DEBUG / '+(low?'LOW':'NORMAL'));log(navigator.userAgent);log('Screen '+innerWidth+'x'+innerHeight+' DPR '+devicePixelRatio);mark('Waiting for Three.js');
+log('White Step 0.8 DEBUG / '+(low?'LOW':'NORMAL'));log(navigator.userAgent);log('Screen '+innerWidth+'x'+innerHeight+' DPR '+devicePixelRatio);mark('Waiting for Three.js');
 setTimeout(function(){if(!frames&&!failed){log('TIMEOUT: no first render; last stage = '+stage);out.hidden=false;};},12000);
 document.getElementById('wsToggle').onclick=function(){out.hidden=!out.hidden;this.textContent=out.hidden?'ログを表示':'ログを隠す';};
 document.getElementById('wsCopy').onclick=async function(){try{await navigator.clipboard.writeText(lines.join('\n'));this.textContent='コピー済み';}catch(e){log('Copy failed: '+e.message);}};
@@ -123,9 +123,9 @@ function safePaint(p){
   return nearLine||farLine||crosswalk;
 }
 block(6.42,.06,39,asphalt,1.56,-.064,-14.5);
-block(.27,.018,39,stripe,0,.015,-14.5);
-block(.27,.018,39,stripe,FAR_X,.015,-14.5);
-for(const x of CROSS_XS)block(.42,.018,CROSS_HALF_Z*2,stripe,x,.018,CROSS_Z);
+block(.27,.32,39,stripe,0,-.136,-14.5);
+block(.27,.32,39,stripe,FAR_X,-.136,-14.5);
+for(const x of CROSS_XS)block(.42,.32,CROSS_HALF_Z*2,stripe,x,-.136,CROSS_Z);
 
 for(let i=0;i<7;i++){
   const z=1.5-i*5.5;
@@ -235,10 +235,7 @@ suitPart(.39,.18,.23,trousers,0,.06,0);
 suitPart(.46,.54,.25,jacket,0,.38,0);
 suitPart(.15,.42,.021,shirt,0,.38,-.136);
 suitPart(.05,.34,.024,tie,0,.37,-.155);
-suitPart(.14,.42,.16,jacket,-.31,.32,0);
-suitPart(.14,.42,.16,jacket,.31,.32,0);
-suitPart(.105,.105,.12,skin,-.31,.06,-.008);
-suitPart(.105,.105,.12,skin,.31,.06,-.008);
+const arms=[-1,1].map(side=>{const g=new THREE.Group();g.position.set(side*.25,.53,0);torsoPivot.add(g);for(const [w,h,d,m,y] of [[.14,.42,.16,jacket,-.19],[.105,.105,.12,skin,-.44]]){const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);mesh.position.y=y;g.add(mesh);torsoOccluders.push(mesh);}return g;});
 // A physical neck and head are attached to the body. The camera sits at the eyes,
 // rather than floating behind the chest as it did in the previous prototype.
 const neck=new THREE.Mesh(new THREE.CylinderGeometry(.080,.094,.19,14),skin);
@@ -267,6 +264,7 @@ let footYaw=[0,0],bodyYaw=0,impact=0;
 let feet,selected,dragging,dragStart,dragSpeed,session;
 let balance,collapseTime,fallOffset,fallVelocity,ended,isWin,overlayDelay,progress;
 let leanX,leanZ,wallContactTime,wallAssist;
+let footV,fallX,fallZ,fallVX,fallVZ,fallRoll,fallSpin;
 let checkpointReached=false,checkpointFeet=null,pedestrianGreen=false,trafficGreen=true;
 let yaw=0,pitch=-1.31,lastFrame=performance.now(),elapsed=0,initialFrame=true;
 function hip(){
@@ -278,6 +276,7 @@ function reset(fromCheckpoint=false){
     [new THREE.Vector3(-.075,.09,.11),new THREE.Vector3(.075,.09,.56)];
   if(!resume){checkpointReached=false;checkpointFeet=null}
   footYaw=[0,0];bodyYaw=0;impact=0;selected=-1;dragging=false;dragStart=null;dragSpeed=0;session=null;
+  footV=[0,0];fallX=fallZ=fallVX=fallVZ=fallRoll=fallSpin=0;camera.layers.disable(1);
   balance=100;collapseTime=0;fallOffset=0;fallVelocity=0;ended=false;isWin=false;overlayDelay=0;
   progress=Math.max(0,-Math.min(feet[0].z,feet[1].z));
   leanX=0;leanZ=0;wallContactTime=0;wallAssist=0;elapsed=0;
@@ -289,6 +288,7 @@ function reset(fromCheckpoint=false){
 }
 function showResult(win,reason){
   if(ended)return;
+  if(!win){const a=feet[0],b=feet[1];const bad=a.y<b.y?a:b;const good=bad===a?b:a;fallVX=(bad.x-good.x)*1.4;fallVZ=(bad.z-good.z)*1.4;fallSpin=(fallVX>=0?-1:1)*1.6;camera.layers.enable(1);status.textContent='うわぁぁ！';}
   ended=true;dragging=false;selected=-1;session=null;isWin=win;
   document.getElementById('result').textContent=win?'PROTOTYPE CLEAR':'GAME OVER';
   document.getElementById('reason').textContent=reason;
@@ -386,7 +386,7 @@ function onPointerUp(e,cancel=false){
     return;
   }
   const f=feet[selected],anchor=feet[1-selected];
-  dragging=false;f.y=.09;dragSpeed*=.3;
+  dragging=false;f.y=.30;footV[selected]=0;dragSpeed*=.3;
   if(feetCollide(f,anchor)){
     f.copy(s.startFoot);footYaw[selected]=s.startYaw;
     status.textContent='足がぶつかるため着地できない。もう一度ドラッグしてね';
@@ -463,6 +463,16 @@ function targetBalance(){
   const supportPenalty=Math.max(...contact)===0?120:contact.filter((v,i)=>!(dragging&&i===selected)).reduce((a,v)=>a+Math.max(0,.45-v)*55,0);
   return {target:clamp(100-supportPenalty-impact-penaltyX-penaltyZ-stride-crossed-movement-leanPenalty+wallAssist,0,100),comX,comZ};
 }
+function updateFeetPhysics(dt){
+  for(let i=0;i<2;i++){
+    if(dragging&&i===selected)continue;
+    const f=feet[i];const grounded=support(f,i)>0;
+    if(grounded&&f.y>=.085&&f.y<=.091){f.y=.09;footV[i]=0;continue;}
+    const old=f.y;footV[i]-=9.8*dt;f.y+=footV[i]*dt;
+    if(grounded&&old>=.09&&f.y<=.09){f.y=.09;footV[i]=0;}
+    if(f.y<-.42){showResult(false,'足を踏み外した！');return;}
+  }
+}
 function updateBalance(dt){
   if(ended)return;
   impact=Math.max(0,impact-dt*35);
@@ -518,30 +528,36 @@ function animate(now){
   const dt=clamp((now-lastFrame)/1000||1/60,.001,.05);
   lastFrame=now;elapsed+=dt;
   dragSpeed*=Math.pow(.79,dt*60);
-  if(!ended){updateTraffic(dt);updateTorso(dt);updateBalance(dt)}
+  if(!ended){updateTraffic(dt);updateFeetPhysics(dt);if(!ended){updateTorso(dt);updateBalance(dt)}}
   else if(!isWin){
-    fallVelocity+=9.8*dt;fallOffset-=fallVelocity*dt;
+    fallVelocity+=9.8*dt;fallOffset-=fallVelocity*dt;fallX+=fallVX*dt;fallZ+=fallVZ*dt;fallRoll+=fallSpin*dt;
+    // Approximate body contact against the underside/side of each solid white beam.
+    const h=hip();const cx=h.x+fallX,cz=h.z+fallZ,cy=.94+fallOffset;
+    const beams=[[0,-14.5,.135,19.5],[FAR_X,-14.5,.135,19.5],...CROSS_XS.map(x=>[x,CROSS_Z,.21,CROSS_HALF_Z])];
+    if(cy>-.65&&cy<.30)for(const [x,z,w,d] of beams){if(Math.abs(cx-x)<w+.23&&Math.abs(cz-z)<d+.23){const side=Math.sign(cx-x)||1;fallX+=side*(w+.231-Math.abs(cx-x));fallVX=side*Math.max(.35,Math.abs(fallVX)*.55);fallSpin=-side*2.4;fallVelocity*=.78;break;}}
   }
   if(ended){
     overlayDelay+=dt;
-    if(overlayDelay>.85)document.getElementById('message').style.display='flex';
+    if(overlayDelay>(isWin?.85:2.0))document.getElementById('message').style.display='flex';
   }
   const base=hip();
-  torsoPivot.position.set(base.x,.94+fallOffset,base.z);
-  torsoPivot.rotation.set(leanZ*.92,bodyYaw,-leanX*.92);
+  torsoPivot.position.set(base.x+fallX,.94+fallOffset,base.z+fallZ);
+  torsoPivot.rotation.set(leanZ*.92,bodyYaw,-leanX*.92+fallRoll);
+  arms.forEach((a,i)=>{a.rotation.z=ended&&!isWin?(i?1:-1)*(1.6+.45*Math.sin(overlayDelay*15)):0;a.rotation.x=ended&&!isWin?.6*Math.sin(overlayDelay*12+i):0;});
   torsoPivot.updateMatrixWorld(true);
   const eyes=eyeAnchor.getWorldPosition(new THREE.Vector3());
   eyes.x=clamp(eyes.x,WALL_FACE+.2,FAR_WALL_FACE-.2);
   if(initialFrame){camera.position.copy(eyes);initialFrame=false}
   else camera.position.lerp(eyes,Math.min(1,dt*11));
   // See-through upper body when looking down: feet and shoe hit targets stay visible.
-  const footView=pitch<-.90;
+  const footView=pitch<-.90&&!(ended&&!isWin);
   torsoOccluders.forEach(mesh=>{mesh.visible=!footView});
   const direction=new THREE.Vector3(Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),-Math.cos(yaw)*Math.cos(pitch));
   camera.lookAt(camera.position.clone().add(direction));
+  if(ended&&!isWin){const focus=torsoPivot.position.clone().add(new THREE.Vector3(0,.25,0));camera.position.copy(focus).add(new THREE.Vector3(2.6,1.05,3.1));camera.lookAt(focus);}
   // Keep legs attached to the feet and hips (including while falling).
   for(let i=0;i<2;i++){
-    const foot=feet[i].clone();foot.y+=fallOffset;
+    const foot=feet[i].clone();foot.y+=fallOffset;foot.x+=fallX;foot.z+=fallZ;if(ended&&!isWin){foot.y+=.15*Math.sin(overlayDelay*14+i*3);foot.z+=.18*Math.sin(overlayDelay*12+i*3);}
     footModels[i].root.position.copy(foot);footModels[i].root.rotation.y=footYaw[i];
     const high=selected===i;
     const suggested=false;
@@ -552,8 +568,8 @@ function animate(now){
     footModels[i].indicator.visible=high||suggested;
     footModels[i].indicator.material.color.setHex(color);
     footModels[i].indicator.material.opacity=high?.48:.28;
-    const top=new THREE.Vector3(base.x+(i?.105:-.105),.97+fallOffset,base.z);
-    const knee=new THREE.Vector3(top.x*.53+foot.x*.47+(i?.04:-.04),.53+fallOffset,top.z*.55+foot.z*.45-.04);
+    const top=new THREE.Vector3(i?.105:-.105,.03,0).applyMatrix4(torsoPivot.matrixWorld);
+    const knee=new THREE.Vector3(top.x*.53+foot.x*.47+(i?.04:-.04),.53+fallOffset+(foot.y-.09-fallOffset)*.45,top.z*.55+foot.z*.45-.04);
     const ankle=foot.clone();ankle.y+=.12;
     alignLimb(limbs[i][0],top,knee);
     alignLimb(limbs[i][1],knee,ankle);
