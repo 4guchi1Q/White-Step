@@ -42,7 +42,7 @@ h1 small{letter-spacing:0;font-size:10px;font-weight:500}
 </head>
 <body>
 <div id="hud">
-  <h1>WHITE STEP <small>Ver.0.6 DEBUG</small></h1>
+  <h1>WHITE STEP <small>Ver.0.6.1 DEBUG</small></h1>
   <div>バランス <span id="balanceText">100%</span></div>
   <div id="bar"><div id="fill"></div></div>
   <div id="posture">重心：安定</div>
@@ -67,11 +67,11 @@ var lines=[],stage='HTML loaded',frames=0,failed=false,low=new URLSearchParams(l
 var out=document.getElementById('wsLog');
 function log(t){lines.push(t);out.textContent=lines.join('\n');out.scrollTop=out.scrollHeight;}
 function mark(t){stage=t;log(t);}
-function fail(e){failed=true;log('ERROR ['+stage+'] '+(e&&e.stack||e&&e.message||String(e)));document.getElementById('wsdebug').hidden=false;out.hidden=false;}
+function fail(e){failed=true;log('ERROR ['+stage+'] '+(e&&e.message?e.name+": "+e.message+"\n"+(e.stack||""):String(e)));document.getElementById('wsdebug').hidden=false;out.hidden=false;}
 window.wsDebug={mark:mark,fail:fail,low:low,frame:function(){frames++;if(frames===1)mark('First render OK');if(frames===60)log('60 frames OK');}};
 window.addEventListener('error',function(e){fail(e.error||e.message||('Resource error: '+(e.target.src||e.target.tagName)));},true);
 window.addEventListener('unhandledrejection',function(e){fail(e.reason);});
-log('White Step 0.6 DEBUG / '+(low?'LOW':'NORMAL'));log(navigator.userAgent);log('Screen '+innerWidth+'x'+innerHeight+' DPR '+devicePixelRatio);mark('Waiting for Three.js');
+log('White Step 0.6.1 DEBUG / '+(low?'LOW':'NORMAL'));log(navigator.userAgent);log('Screen '+innerWidth+'x'+innerHeight+' DPR '+devicePixelRatio);mark('Waiting for Three.js');
 setTimeout(function(){if(!frames&&!failed)log('TIMEOUT: no first render; last stage = '+stage);},12000);
 document.getElementById('wsToggle').onclick=function(){out.hidden=!out.hidden;this.textContent=out.hidden?'ログを表示':'ログを隠す';};
 document.getElementById('wsCopy').onclick=async function(){try{await navigator.clipboard.writeText(lines.join('\n'));this.textContent='コピー済み';}catch(e){log('Copy failed: '+e.message);}};
@@ -424,8 +424,8 @@ addEventListener('resize',()=>{
 });
 function updateTorso(dt){
   const base=hip();
-  const support=dragging?feet[1-selected]:feet[0].clone().add(feet[1]).multiplyScalar(.5);
-  const side=base.x-support.x,depth=base.z-support.z;
+  const supportCenter=dragging?feet[1-selected]:feet[0].clone().add(feet[1]).multiplyScalar(.5);
+  const side=base.x-supportCenter.x,depth=base.z-supportCenter.z;
   const danger=clamp((55-balance)/55,0,1);
   // Lean naturally in response to displaced support; severe imbalance adds a delayed tip.
   const sideGoal=clamp(side*2.45+Math.sign(side)*danger*.45,-1.05,1.05);
@@ -449,9 +449,9 @@ function updateTorso(dt){
 }
 function targetBalance(){
   const base=hip();
-  const support=dragging?feet[1-selected]:feet[0].clone().add(feet[1]).multiplyScalar(.5);
+  const supportCenter=dragging?feet[1-selected]:feet[0].clone().add(feet[1]).multiplyScalar(.5);
   const comX=base.x+leanX*.40,comZ=base.z+leanZ*.40;
-  const lateral=Math.abs(comX-support.x),depth=Math.abs(comZ-support.z);
+  const lateral=Math.abs(comX-supportCenter.x),depth=Math.abs(comZ-supportCenter.z);
   const span=Math.hypot(feet[0].x-feet[1].x,feet[0].z-feet[1].z);
   // Sideways crosswalk steps need to be difficult but physically possible.
   const penaltyX=Math.max(0,lateral-.04)/(dragging?.29:.16)*28;
