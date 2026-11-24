@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>WHITE STEP | Prototype 0.9.6</title>
+<title>WHITE STEP | Prototype 0.9.7</title>
 <style>
 *{box-sizing:border-box;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent} html,body{touch-action:none;overscroll-behavior:none} #hint,#posture,#signalStatus,#checkpointStatus,#crosshair{display:none} #status{display:none}
 body{margin:0;overflow:hidden;background:#111822;color:#fff;font-family:system-ui,-apple-system,sans-serif}
@@ -43,7 +43,7 @@ h1 small{letter-spacing:0;font-size:10px;font-weight:500}
 </head>
 <body>
 <div id="hud">
-  <h1>WHITE STEP <small>Ver.0.9.6 DEBUG</small></h1>
+  <h1>WHITE STEP <small>Ver.0.9.7 DEBUG</small></h1>
   
   
   
@@ -73,7 +73,7 @@ function fail(e){failed=true;log('ERROR ['+stage+'] '+(e&&e.message?e.name+": "+
 window.wsDebug={mark:mark,fail:fail,low:low,frame:function(){frames++;if(frames===1)mark('First render OK');if(frames===60)log('60 frames OK');}};
 window.addEventListener('error',function(e){fail(e.error||e.message||('Resource error: '+(e.target.src||e.target.tagName)));},true);
 window.addEventListener('unhandledrejection',function(e){fail(e.reason);});
-log('White Step 0.9.6 DEBUG / '+(low?'LOW':'NORMAL'));log(navigator.userAgent);log('Screen '+innerWidth+'x'+innerHeight+' DPR '+devicePixelRatio);mark('Waiting for Three.js');
+log('White Step 0.9.7 DEBUG / '+(low?'LOW':'NORMAL'));log(navigator.userAgent);log('Screen '+innerWidth+'x'+innerHeight+' DPR '+devicePixelRatio);mark('Waiting for Three.js');
 setTimeout(function(){if(!frames&&!failed){log('TIMEOUT: no first render; last stage = '+stage);out.hidden=false;};},12000);
 document.getElementById('wsToggle').onclick=function(){out.hidden=!out.hidden;this.textContent=out.hidden?'ログを表示':'ログを隠す';};
 document.getElementById('wsCopy').onclick=async function(){try{await navigator.clipboard.writeText(lines.join('\n'));this.textContent='コピー済み';}catch(e){log('Copy failed: '+e.message);}};
@@ -303,7 +303,11 @@ function initPhysics(){
   }
 }
 let mode='stable', unstableAge=0;
-const upright=()=>new THREE.Quaternion();
+const upright=()=>new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),bodyYaw);
+function meanYaw(){const x=Math.sin(footYaw[0])+Math.sin(footYaw[1]),z=Math.cos(footYaw[0])+Math.cos(footYaw[1]);return Math.hypot(x,z)<.15?bodyYaw:Math.atan2(x,z);}
+function crossing(a=meanYaw()){return (feet[1].x-feet[0].x)*Math.cos(a)-(feet[1].z-feet[0].z)*Math.sin(a);}
+function updateBodyYaw(dt){if(ended||dragging||mode==='unstable')return;const target=meanYaw();const d=Math.atan2(Math.sin(target-bodyYaw),Math.cos(target-bodyYaw));const step=d*(1-Math.exp(-dt*9));bodyYaw+=step;if(!session)yaw-=step;}
+
 function pin(b,p,q){b.setBodyType(R.RigidBodyType.KinematicPositionBased,true);b.setTranslation(p,true);b.setRotation(q,true);b.setNextKinematicTranslation(p);b.setNextKinematicRotation(q);}
 function free(b){if(b.bodyType()!==R.RigidBodyType.Dynamic)b.setBodyType(R.RigidBodyType.Dynamic,true);}
 function vec(p){return new THREE.Vector3(p.x,p.y,p.z)}
@@ -331,12 +335,12 @@ function physicsStep(dt){
   const up=new THREE.Vector3(0,1,0).applyQuaternion(new THREE.Quaternion(q.x,q.y,q.z,q.w));
   const recover=up.y>.48&&t.y>.80;
   const controlled=!ended&&(mode==='stable'||mode==='walk'||(active<0&&good.every(Boolean)&&recover));
-  const safe=controlled&&(active>=0?good[1-active]:good.every(Boolean));
+  const safe=controlled&&(active>=0?good[1-active]:good.every(Boolean)&&crossing()>-.10);
   if(safe){
     mode=active>=0?'walk':'stable';unstableAge=0;
     for(let i=0;i<2;i++){if(i!==active)feet[i].y=.09;pin(shoeBodies[i],feet[i],new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),footYaw[i]));}
     const anchor=active>=0?feet[1-active]:feet[0].clone().add(feet[1]).multiplyScalar(.5);
-    pin(rig,{x:anchor.x,y:1.48,z:anchor.z-.10},upright());
+    pin(rig,{x:anchor.x-.10*Math.sin(bodyYaw),y:1.48,z:anchor.z-.10*Math.cos(bodyYaw)},upright());
     accumulator=0;return;
   }
   if(mode==='stable'||mode==='walk'){
@@ -456,7 +460,7 @@ function onPointerMove(e){
     footYaw[selected]+=delta*.32;
   }else footYaw[selected]=session.startYaw;
   dragSpeed=clamp(dragSpeed*.55+Math.hypot(dx,dy)/95,0,1.8);
-  if(feetCollide(feet[selected],anchor)){
+  if(feetCollide(feet[selected],anchor)||crossing()<-.30){
     status.textContent='足同士が重なっている！ この位置には着地できない';
   }else{
     status.textContent='白線上に着地させよう';
@@ -484,7 +488,7 @@ function onPointerUp(e,cancel=false){
   const moveX=f.x-s.startFoot.x,moveZ=f.z-s.startFoot.z;
   if(Math.hypot(moveX,moveZ)>.045)footYaw[selected]=Math.atan2(-moveX,-moveZ);
   else footYaw[selected]=s.startYaw;
-  if(feetCollide(f,anchor)){
+  if(feetCollide(f,anchor)||crossing()<-.30){
     f.copy(s.startFoot);footYaw[selected]=s.startYaw;
     status.textContent='足がぶつかるため着地できない。もう一度ドラッグしてね';
     return;
@@ -492,7 +496,7 @@ function onPointerUp(e,cancel=false){
   // Unsupported feet do not cause instant death; balance and remaining support decide.
   pin(shoeBodies[selected],f,new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),footYaw[selected]));held=-1;
   progress=Math.max(progress,-Math.min(feet[0].z,feet[1].z));
-  bodyYaw=footYaw[selected];selected=-1;dragStart=null;
+  selected=-1;dragStart=null;
   if(!checkpointReached&&feet.every(p=>Math.abs(p.x-FAR_X)<.19&&p.z<CHECKPOINT_Z+.45)){
     checkpointReached=true;checkpointFeet=feet.map(p=>new THREE.Vector3(p.x,.09,p.z));
     document.getElementById('checkpointStatus').textContent='CHECKPOINT：到達済み';
@@ -556,7 +560,7 @@ function animate(now){
   const dt=clamp((now-lastFrame)/1000||1/60,.001,.05);
   lastFrame=now;elapsed+=dt;
   dragSpeed*=Math.pow(.79,dt*60);
-  if(!ended)updateTraffic(dt);if(!isWin)physicsStep(dt);
+  if(!ended){updateTraffic(dt);updateBodyYaw(dt);}if(!isWin)physicsStep(dt);
   if(ended){
     overlayDelay+=dt;
     if(overlayDelay>(isWin?.85:2.0))document.getElementById('message').style.display='flex';
@@ -587,7 +591,7 @@ function animate(now){
     footModels[i].root.position.copy(foot);const sq=shoeBodies[i].rotation();footModels[i].root.quaternion.set(sq.x,sq.y,sq.z,sq.w);
     const high=selected===i;
     const suggested=false;
-    const blocked=high&&feetCollide(feet[i],feet[1-i]);
+    const blocked=high&&(feetCollide(feet[i],feet[1-i])||crossing()<-.30);
     const color=blocked?0xff5c5c:high?0x45ddff:0x86f3a5;
     shoeMats[i].emissive.setHex(high?color:0);
     shoeMats[i].emissiveIntensity=high?.66:0;
@@ -599,7 +603,7 @@ function animate(now){
     const axis=ankle.clone().sub(top), dist=axis.length();
     // Keep visible shoes at the actual collider positions, including during falls.
     const mid=top.clone().add(ankle).multiplyScalar(.5);
-    const bend=new THREE.Vector3(0,0,-1);const dir=ankle.clone().sub(top).normalize();bend.addScaledVector(dir,-bend.dot(dir));if(bend.lengthSq()<.001)bend.set(1,0,0);
+    const bend=new THREE.Vector3(0,0,-1).applyQuaternion(torsoPivot.quaternion);const dir=ankle.clone().sub(top).normalize();bend.addScaledVector(dir,-bend.dot(dir));if(bend.lengthSq()<.001)bend.set(1,0,0);
     const knee=mid.add(bend.normalize().multiplyScalar(Math.sqrt(Math.max(0,.49*.49-top.distanceToSquared(ankle)/4))));
     if(fallLegs[i]){fallLegs[i].forEach(({rb,len},j)=>{const m=limbs[i][j];m.position.copy(vec(rb.translation()));m.quaternion.copy(quat(rb));m.scale.set(1,len,1);});continue;}
     alignLimb(limbs[i][0],top,knee);
