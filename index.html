@@ -42,7 +42,7 @@ h1 small{letter-spacing:0;font-size:10px;font-weight:500}
 </head>
 <body>
 <div id="hud">
-  <h1>WHITE STEP <small>Ver.0.9.1 DEBUG</small></h1>
+  <h1>WHITE STEP <small>Ver.0.9.2 DEBUG</small></h1>
   
   
   
@@ -71,7 +71,7 @@ function fail(e){failed=true;log('ERROR ['+stage+'] '+(e&&e.message?e.name+": "+
 window.wsDebug={mark:mark,fail:fail,low:low,frame:function(){frames++;if(frames===1)mark('First render OK');if(frames===60)log('60 frames OK');}};
 window.addEventListener('error',function(e){fail(e.error||e.message||('Resource error: '+(e.target.src||e.target.tagName)));},true);
 window.addEventListener('unhandledrejection',function(e){fail(e.reason);});
-log('White Step 0.9.1 DEBUG / '+(low?'LOW':'NORMAL'));log(navigator.userAgent);log('Screen '+innerWidth+'x'+innerHeight+' DPR '+devicePixelRatio);mark('Waiting for Three.js');
+log('White Step 0.9.2 DEBUG / '+(low?'LOW':'NORMAL'));log(navigator.userAgent);log('Screen '+innerWidth+'x'+innerHeight+' DPR '+devicePixelRatio);mark('Waiting for Three.js');
 setTimeout(function(){if(!frames&&!failed){log('TIMEOUT: no first render; last stage = '+stage);out.hidden=false;};},12000);
 document.getElementById('wsToggle').onclick=function(){out.hidden=!out.hidden;this.textContent=out.hidden?'ログを表示':'ログを隠す';};
 document.getElementById('wsCopy').onclick=async function(){try{await navigator.clipboard.writeText(lines.join('\n'));this.textContent='コピー済み';}catch(e){log('Copy failed: '+e.message);}};
@@ -294,45 +294,46 @@ function initPhysics(){
     joint.setContactsEnabled(false);
   }
 }
+let mode='stable';
+const upright=()=>new THREE.Quaternion();
+function pin(b,p,q){b.setBodyType(R.RigidBodyType.KinematicPositionBased,true);b.setTranslation(p,true);b.setRotation(q,true);b.setNextKinematicTranslation(p);b.setNextKinematicRotation(q);}
+function free(b){if(b.bodyType()!==R.RigidBodyType.Dynamic)b.setBodyType(R.RigidBodyType.Dynamic,true);}
 function physicsStep(dt){
-  accumulator=Math.min(accumulator+dt,.075);
   const active=dragging&&!ended?selected:-1;
-  if(held!==active){if(held>=0){const b=shoeBodies[held];b.setBodyType(R.RigidBodyType.Dynamic,true);b.setTranslation(feet[held],true);b.setLinvel({x:0,y:0,z:0},true);b.setAngvel({x:0,y:0,z:0},true);}held=active;if(held>=0)shoeBodies[held].setBodyType(R.RigidBodyType.KinematicPositionBased,true);}
-  if(held>=0){const b=shoeBodies[held];b.setNextKinematicTranslation(feet[held]);b.setNextKinematicRotation(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),footYaw[held]));}
-  while(accumulator>=1/120){
-    const h=1/120,t=rig.translation(),v=rig.linvel(),q=rig.rotation(),av=rig.angvel();
-    const rot=new THREE.Quaternion(q.x,q.y,q.z,q.w);
-    // Compliant leg actuators: equal and opposite impulses, limited muscle force.
-    for(let i=0;i<2;i++){
-      const b=shoeBodies[i],p=b.translation(),bv=b.linvel();
-      const joint=new THREE.Vector3(i?.105:-.105,-.35,0).applyQuaternion(rot).add(new THREE.Vector3(t.x,t.y,t.z));
-      const delta=joint.clone().sub(new THREE.Vector3(p.x,p.y,p.z));const len=delta.length();if(len<.001)continue;
-      const axis=delta.multiplyScalar(1/len),rel=new THREE.Vector3(v.x-bv.x,v.y-bv.y,v.z-bv.z).dot(axis);
-      const force=clamp((.91-len)*3600-rel*180,-180,1000)*(ended?.05:1);
-      const impulse=axis.multiplyScalar(force*h);
-      rig.applyImpulseAtPoint(impulse,joint,true);if(i!==held)b.applyImpulse(impulse.clone().negate(),true);
-    }
-    if(!ended){
-      const planted=shoeBodies.map((b,i)=>({b,i,p:b.translation()})).filter(o=>o.i!==held&&o.p.y>.045&&o.p.y<.13&&support(o.p,o.i)>.25);
-      if(planted.length){
-        const center=planted.reduce((a,o)=>a.add(new THREE.Vector3(o.p.x,0,o.p.z-.10)),new THREE.Vector3()).multiplyScalar(1/planted.length);
-        const dx=center.x-t.x,dz=center.z-t.z;
-        // Bounded posture control; no position snapping or balance meter.
-        const f=new THREE.Vector3(dx*350-v.x*110,0,dz*350-v.z*110);if(f.length()>125)f.setLength(125);
-        rig.applyImpulse(f.multiplyScalar(h),true);
-        const up=new THREE.Vector3(0,1,0).applyQuaternion(rot),torque=up.cross(new THREE.Vector3(0,1,0)).multiplyScalar(420).sub(new THREE.Vector3(av.x,0,av.z).multiplyScalar(75));
-        if(torque.length()>100)torque.setLength(100);rig.applyTorqueImpulse(torque.multiplyScalar(h),true);
-      }
-    }
-    world.step();accumulator-=h;
+  const good=feet.map((f,i)=>support(f,i)>=.72&&safePaint({x:f.x,z:f.z-.10})&&f.y>=-.04&&f.y<=.32);
+  const t=rig.translation(),q=rig.rotation();
+  const up=new THREE.Vector3(0,1,0).applyQuaternion(new THREE.Quaternion(q.x,q.y,q.z,q.w));
+  const recover=up.y>.55&&t.y>.70;
+  const controlled=!ended&&(mode==='stable'||mode==='walk'||(active<0&&good.every(Boolean)&&recover));
+  const safe=controlled&&(active>=0?good[1-active]:good.every(Boolean));
+  if(safe){
+    mode=active>=0?'walk':'stable';
+    for(let i=0;i<2;i++){if(i!==active)feet[i].y=.09;pin(shoeBodies[i],feet[i],new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),footYaw[i]));}
+    const anchor=active>=0?feet[1-active]:feet[0].clone().add(feet[1]).multiplyScalar(.5);
+    pin(rig,{x:anchor.x,y:1.25,z:anchor.z-.10},upright());
+    accumulator=0;return;
   }
-  shoeBodies.forEach((b,i)=>{if(i!==held){const p=b.translation();feet[i].set(p.x,p.y,p.z);}});
-  if(!ended&&(rig.translation().y<.48||feet.every(f=>f.y<-.35)))showResult(false,'足場を失った！');
+  if(mode==='stable'||mode==='walk'){
+    mode='unstable';free(rig);
+    const bad=good[0]?1:0,other=1-bad;
+    const dx=feet[bad].x-feet[other].x,dz=feet[bad].z-feet[other].z;
+    rig.setLinvel({x:dx*.55,y:-.12,z:dz*.55},true);
+    rig.setAngvel({x:dz*1.1,y:0,z:-dx*1.1},true);
+  }
+  for(let i=0;i<2;i++){
+    if(i===active||(!ended&&good[i])){if(i!==active)feet[i].y=.09;pin(shoeBodies[i],feet[i],new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),footYaw[i]));}
+    else free(shoeBodies[i]);
+  }
+  accumulator=Math.min(accumulator+dt,.075);
+  while(accumulator>=1/120){world.step();accumulator-=1/120;}
+  shoeBodies.forEach((b,i)=>{if(i!==active){const p=b.translation();feet[i].set(p.x,p.y,p.z);}});
+  const r=rig.rotation(),u=new THREE.Vector3(0,1,0).applyQuaternion(new THREE.Quaternion(r.x,r.y,r.z,r.w));
+  if(!ended&&(rig.translation().y<.65||u.y<.25||feet.every(f=>f.y<-.25))){mode='fall';showResult(false,'足場を失った！');}
 }
 function reset(fromCheckpoint=false){
   const resume=fromCheckpoint===true&&checkpointReached&&checkpointFeet;
   feet=resume?checkpointFeet.map(f=>f.clone()):
-    [new THREE.Vector3(-.075,.09,.11),new THREE.Vector3(.075,.09,.56)];
+    [new THREE.Vector3(-.035,.09,.11),new THREE.Vector3(.035,.09,.56)];
   if(!resume){checkpointReached=false;checkpointFeet=null}
   footYaw=[0,0];bodyYaw=0;impact=0;selected=-1;dragging=false;dragStart=null;dragSpeed=0;session=null;
   footV=[0,0];fallX=fallZ=fallVX=fallVZ=fallRoll=fallSpin=0;camera.layers.disable(1);
@@ -341,7 +342,7 @@ function reset(fromCheckpoint=false){
   leanX=0;leanZ=0;wallContactTime=0;wallAssist=0;elapsed=0;
   for(const car of cars){car.z=car.origin;car.root.position.z=car.z}
   document.getElementById('checkpointStatus').textContent='CHECKPOINT：'+(checkpointReached?'到達済み':'未到達');
-  initPhysics();yaw=0;pitch=-1.31;initialFrame=true;lastFrame=performance.now();
+  initPhysics();mode="stable";yaw=0;pitch=-1.31;initialFrame=true;lastFrame=performance.now();
   document.getElementById('message').style.display='none';
   status.textContent=resume?'チェックポイントから再開！ 好きな足を選ぼう':'好きな足をタップして出勤開始！';
 }
@@ -445,14 +446,14 @@ function onPointerUp(e,cancel=false){
     return;
   }
   const f=feet[selected],anchor=feet[1-selected];
-  dragging=false;f.y=.30;footV[selected]=0;dragSpeed*=.3;
+  dragging=false;f.y=.09;footV[selected]=0;dragSpeed*=.3;
   if(feetCollide(f,anchor)){
     f.copy(s.startFoot);footYaw[selected]=s.startYaw;
     status.textContent='足がぶつかるため着地できない。もう一度ドラッグしてね';
     return;
   }
   // Unsupported feet do not cause instant death; balance and remaining support decide.
-  const released=shoeBodies[selected];released.setBodyType(R.RigidBodyType.Dynamic,true);released.setTranslation(f,true);released.setRotation(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),footYaw[selected]),true);released.setLinvel({x:0,y:0,z:0},true);released.setAngvel({x:0,y:0,z:0},true);held=-1;
+  pin(shoeBodies[selected],f,new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),footYaw[selected]));held=-1;
   progress=Math.max(progress,-Math.min(feet[0].z,feet[1].z));
   bodyYaw=footYaw[selected];selected=-1;dragStart=null;
   if(!checkpointReached&&feet.every(p=>Math.abs(p.x-FAR_X)<.19&&p.z<CHECKPOINT_Z+.45)){
@@ -555,7 +556,7 @@ function animate(now){
     const top=new THREE.Vector3(i?.105:-.105,.03,0).applyMatrix4(torsoPivot.matrixWorld);
     const ankle=foot.clone();ankle.y+=.12;
     const axis=ankle.clone().sub(top), dist=axis.length();
-    if(dist>.98)ankle.copy(top).add(axis.setLength(.98));
+    if(dist>.98){ankle.copy(top).add(axis.setLength(.98));footModels[i].root.position.copy(ankle).add(new THREE.Vector3(0,-.12,0));}
     const mid=top.clone().add(ankle).multiplyScalar(.5);
     const bend=new THREE.Vector3(0,0,-1);const dir=ankle.clone().sub(top).normalize();bend.addScaledVector(dir,-bend.dot(dir));if(bend.lengthSq()<.001)bend.set(1,0,0);
     const knee=mid.add(bend.normalize().multiplyScalar(Math.sqrt(Math.max(0,.49*.49-top.distanceToSquared(ankle)/4))));
