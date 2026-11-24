@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>WHITE STEP | Prototype 0.5</title>
+<title>WHITE STEP | Prototype 0.6</title>
 <style>
-*{box-sizing:border-box}
+*{box-sizing:border-box;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent} html,body{touch-action:none;overscroll-behavior:none} #hint,#posture,#signalStatus,#checkpointStatus,#crosshair{display:none} #status{display:none}
 body{margin:0;overflow:hidden;background:#111822;color:#fff;font-family:system-ui,-apple-system,sans-serif}
 canvas{display:block;touch-action:none}
 button{border:1px solid #ffffff6b;background:#172333e8;color:#fff;padding:11px 14px;border-radius:10px;font-weight:700;cursor:pointer;touch-action:none}
@@ -42,7 +42,7 @@ h1 small{letter-spacing:0;font-size:10px;font-weight:500}
 </head>
 <body>
 <div id="hud">
-  <h1>WHITE STEP <small>Ver.0.5</small></h1>
+  <h1>WHITE STEP <small>Ver.0.6</small></h1>
   <div>バランス <span id="balanceText">100%</span></div>
   <div id="bar"><div id="fill"></div></div>
   <div id="posture">重心：安定</div>
@@ -77,7 +77,7 @@ const sunlight = new THREE.DirectionalLight(0xffe9c8,2.1);
 sunlight.position.set(-6,16,11);sunlight.castShadow=true;scene.add(sunlight);
 const material = hex => new THREE.MeshStandardMaterial({color:hex,roughness:.89});
 const asphalt=material(0x373c42),stripe=material(0xf2f1e9),concrete=material(0x9c9d96);
-const sidewalk=material(0xaaa9a1),darkWall=material(0x747e82),windowMat=material(0x354b63);
+const sidewalk=material(0x999b9d),darkWall=material(0x747e82),windowMat=material(0x354b63);
 const black=material(0x151a22),trousers=material(0x303c4e),jacket=material(0x28364a);
 const shirt=material(0xe6e9e7),tie=material(0x822b39),skin=material(0xc8a087);
 function block(w,h,d,mat,x,y,z,cast=false){
@@ -86,33 +86,33 @@ function block(w,h,d,mat,x,y,z,cast=false){
 }
 // One continuous commute: near curb -> five white crosswalk stripes -> far curb -> office.
 // The road is visual-only; these exact painted regions have foot support.
-const STRIPE_HALF=.135, FAR_X=4.25, WALL_FACE=-.78, FAR_WALL_FACE=5.08;
+const STRIPE_HALF=.135, FAR_X=4.25, WALL_FACE=-1.65, FAR_WALL_FACE=5.90;
 const CROSS_Z=-7.1,CROSS_HALF_Z=.76,CROSS_XS=[.57,1.35,2.13,2.91,3.69];
 const CHECKPOINT_Z=-12.4,GOAL_Z=-26.0;
 function safePaint(p){
-  const nearLine=Math.abs(p.x)<=STRIPE_HALF&&p.z>=-8.25&&p.z<=3.0;
-  const farLine=Math.abs(p.x-FAR_X)<=STRIPE_HALF&&p.z<=-5.95&&p.z>=-31;
+  const nearLine=Math.abs(p.x)<=STRIPE_HALF&&p.z>=-34&&p.z<=5;
+  const farLine=Math.abs(p.x-FAR_X)<=STRIPE_HALF&&p.z<=5&&p.z>=-34;
   const crosswalk=Math.abs(p.z-CROSS_Z)<=CROSS_HALF_Z&&CROSS_XS.some(x=>Math.abs(p.x-x)<=.21);
   return nearLine||farLine||crosswalk;
 }
 block(4.72,.06,39,asphalt,2.12,-.064,-14.5);
-block(.27,.018,11.3,stripe,0,.015,-2.65);
-block(.27,.018,25.2,stripe,FAR_X,.015,-18.5);
+block(.27,.018,39,stripe,0,.015,-14.5);
+block(.27,.018,39,stripe,FAR_X,.015,-14.5);
 for(const x of CROSS_XS)block(.42,.018,CROSS_HALF_Z*2,stripe,x,.018,CROSS_Z);
-block(.54,.13,39,sidewalk,-.495,-.006,-14.5);
-block(.54,.13,39,sidewalk,4.785,-.006,-14.5);
+block(1.40,.13,39,sidewalk,-.95,-.006,-14.5);
+block(1.40,.13,39,sidewalk,5.20,-.006,-14.5);
 block(.09,.12,39,concrete,-.25,.012,-14.5);
 block(.09,.12,39,concrete,4.49,.012,-14.5);
 for(let i=0;i<7;i++){
   const z=1.5-i*5.5;
   const houseMat=material(i%3===0?0x9da9ae:i%3===1?0xc0b2a4:0x9aa7a1);
   const height=3.6+(i%3)*.6;
-  block(.22,1.43,5.4,i%3?concrete:darkWall,-.89,.71,z,true);
-  block(3.1,height,4.75,houseMat,-2.65,height/2-.05,z,true);
-  block(.09,.64,.92,windowMat,-1.08,1.3,z-.85);
-  block(.22,1.35,5.4,concrete,5.19,.67,z,true);
-  block(3.2,4.15,4.7,material(i%2?0xc7b8ab:0xa6b5bb),7.1,2.02,z,true);
-  block(.09,.65,.92,windowMat,5.49,1.4,z+.6);
+  block(.22,1.43,5.4,i%3?concrete:darkWall,-1.76,.71,z,true);
+  block(3.1,height,4.75,houseMat,-3.52,height/2-.05,z,true);
+  block(.09,.64,.92,windowMat,-1.95,1.3,z-.85);
+  block(.22,1.35,5.4,concrete,6.01,.67,z,true);
+  block(3.2,4.15,4.7,material(i%2?0xc7b8ab:0xa6b5bb),7.92,2.02,z,true);
+  block(.09,.65,.92,windowMat,6.31,1.4,z+.6);
 }
 // A distinct office beyond the checkpoint; there are no separate scene loads.
 const office=material(0x788d9e);
@@ -144,14 +144,17 @@ function lamp(x,y,z,color){
   const orb=new THREE.Mesh(new THREE.SphereGeometry(.105,12,10),m);
   orb.position.set(x,y,z);scene.add(orb);return m;
 }
-block(.09,2.1,.09,darkWall,4.75,1.05,-6.1);
-block(.28,.57,.20,black,4.75,2.17,-6.1);
-const pedRedLamp=lamp(4.75,2.30,-5.98,0xff2424);
-const pedBlueLamp=lamp(4.75,2.06,-5.98,0x30f7a2);
-block(.09,2.55,.09,darkWall,1.0,1.28,-4.3);
-block(.32,.65,.24,black,1.0,2.42,-4.3);
-const carRedLamp=lamp(1.0,2.59,-4.16,0xff2020);
-const carBlueLamp=lamp(1.0,2.30,-4.16,0x44db82);
+function signal(x,z,angle,ped){
+ const h=ped?2.35:4.65; const group=new THREE.Group();group.position.set(x,0,z);group.rotation.y=angle;scene.add(group);
+ function part(w,h,d,x,y,z,mat){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);m.position.set(x,y,z);group.add(m);return m;}
+ part(.12,h,.12,0,h/2,0,darkWall);
+ const offset=ped?0:1.15;
+ if(!ped)part(2.3,.10,.10,offset,h,0,darkWall);
+ part(ped?.32:.92,ped?.58:.32,.22,offset,h,0,black);
+ return (ped?[0xff2525,0x27ed85]:[0xff2525,0xffc42b,0x27ed85]).map((c,i)=>{const m=new THREE.MeshStandardMaterial({color:0x303030,emissive:c,emissiveIntensity:.04});const o=new THREE.Mesh(new THREE.SphereGeometry(.105,16,12),m);o.position.set(offset+(ped?0:(1-i)*.28),h+(ped?(.14-i*.28):0),.13);group.add(o);return m;});
+}
+const pedSignals=[signal(4.65,CROSS_Z,-Math.PI/2,true),signal(-.40,CROSS_Z,Math.PI/2,true)];
+const carSignals=[signal(-.42,-8.65,0,false),signal(4.67,-5.55,Math.PI,false)];
 function makeCar(x,z,hex,dir,speed){
   const root=new THREE.Group();scene.add(root);
   const bodyMat=material(hex),glass=material(0x344f69),rubber=material(0x15181f);
@@ -163,10 +166,10 @@ function makeCar(x,z,hex,dir,speed){
     const wheel=new THREE.Mesh(new THREE.CylinderGeometry(.16,.16,.085,12),rubber);
     wheel.rotation.z=Math.PI/2;wheel.position.set(xx,.16,zz);root.add(wheel);
   }
-  root.position.set(x,0,z);
+  root.scale.set(2.05,2.05,2.65);root.rotation.y=dir>0?Math.PI:0;root.position.set(x,0,z);
   return {root,x,z,origin:z,dir,speed};
 }
-const cars=[makeCar(1.36,3.4,0xc74b42,-1,2.4),makeCar(2.94,-29,0x476fbb,1,2.1)];
+const cars=[makeCar(1.13,3.4,0xc74b42,-1,2.4),makeCar(3.12,-29,0x476fbb,1,2.1)];
 // Two solid, separately hittable shoes. Height differences allow one foot to swing over another.
 const footModels=[],shoeMats=[];
 for(let i=0;i<2;i++){
@@ -232,6 +235,7 @@ const ray=new THREE.Raycaster(),pointer=new THREE.Vector2();
 const plane=new THREE.Plane(new THREE.Vector3(0,1,0),0);
 const hitPoint=new THREE.Vector3();
 const status=document.getElementById('status');
+let footYaw=[0,0],bodyYaw=0,impact=0;
 let feet,selected,dragging,dragStart,dragSpeed,session;
 let balance,collapseTime,fallOffset,fallVelocity,ended,isWin,overlayDelay,progress;
 let leanX,leanZ,wallContactTime,wallAssist;
@@ -245,7 +249,7 @@ function reset(fromCheckpoint=false){
   feet=resume?checkpointFeet.map(f=>f.clone()):
     [new THREE.Vector3(-.075,.09,.11),new THREE.Vector3(.075,.09,.56)];
   if(!resume){checkpointReached=false;checkpointFeet=null}
-  selected=-1;dragging=false;dragStart=null;dragSpeed=0;session=null;
+  footYaw=[0,0];bodyYaw=0;impact=0;selected=-1;dragging=false;dragStart=null;dragSpeed=0;session=null;
   balance=100;collapseTime=0;fallOffset=0;fallVelocity=0;ended=false;isWin=false;overlayDelay=0;
   progress=Math.max(0,-Math.min(feet[0].z,feet[1].z));
   leanX=0;leanZ=0;wallContactTime=0;wallAssist=0;elapsed=0;
@@ -288,12 +292,12 @@ function tappedFoot(e){
   return nearest;
 }
 // Collision uses the full footprint of the two shoes rather than center points.
-function feetCollide(a,b){
-  return Math.abs(a.x-b.x)<.178&&Math.abs(a.z-b.z)<.385;
-}
+function shoeRect(p,angle){const c=Math.cos(angle),s=Math.sin(angle);return [[-.085,-.29],[.085,-.29],[.085,.085],[-.085,.085]].map(([x,z])=>({x:p.x+c*x+s*z,z:p.z-s*x+c*z}));}
+function feetCollide(a,b){const ia=feet.indexOf(a),ib=feet.indexOf(b);const aa=footYaw[ia<0?selected:ia]||0,bb=footYaw[ib<0?1-selected:ib]||0;const A=shoeRect(a,aa),B=shoeRect(b,bb);return [aa,aa+Math.PI/2,bb,bb+Math.PI/2].every(t=>{const proj=P=>P.map(p=>p.x*Math.cos(t)+p.z*Math.sin(t));const x=proj(A),y=proj(B);return Math.max(...x)>Math.min(...y)+.002&&Math.max(...y)>Math.min(...x)+.002;});}
+function support(p,i){let n=0,total=0;const a=footYaw[i],c=Math.cos(a),s=Math.sin(a);for(let x=-.08;x<=.081;x+=.02)for(let z=-.28;z<=.081;z+=.02){total++;if(safePaint({x:p.x+c*x+s*z,z:p.z-s*x+c*z}))n++;}return n/total;}
 function resetSelection(){
   if(selected>=0){
-    if(dragging&&dragStart)feet[selected].copy(dragStart);
+    if(dragging&&dragStart){feet[selected].copy(dragStart);if(session)footYaw[selected]=session.startYaw;}
     feet[selected].y=.09;
   }
   selected=-1;dragging=false;dragStart=null;dragSpeed=0;
@@ -304,7 +308,7 @@ function onPointerDown(e){
   const hit=tappedFoot(e);
   const ground=selected>=0?groundPosition(e):null;
   session={id:e.pointerId,startX:e.clientX,startY:e.clientY,lastX:e.clientX,lastY:e.clientY,hit,moved:false,
-    startGround:ground,startFoot:selected>=0?feet[selected].clone():null};
+    startYaw:selected>=0?footYaw[selected]:0,startGround:ground,startFoot:selected>=0?feet[selected].clone():null};
   renderer.domElement.setPointerCapture(e.pointerId);
 }
 function onPointerMove(e){
@@ -328,6 +332,7 @@ function onPointerMove(e){
   const offX=wantedX-anchor.x,offZ=wantedZ-anchor.z;
   const reach=Math.min(1,1.08/Math.max(.001,Math.hypot(offX,offZ)));
   feet[selected].set(anchor.x+offX*reach,.30,anchor.z+offZ*reach);
+  footYaw[selected]=-yaw;
   dragSpeed=clamp(dragSpeed*.55+Math.hypot(dx,dy)/95,0,1.8);
   if(feetCollide(feet[selected],anchor)){
     status.textContent='足同士が重なっている！ この位置には着地できない';
@@ -355,16 +360,13 @@ function onPointerUp(e,cancel=false){
   const f=feet[selected],anchor=feet[1-selected];
   dragging=false;f.y=.09;dragSpeed*=.3;
   if(feetCollide(f,anchor)){
-    f.copy(s.startFoot);
+    f.copy(s.startFoot);footYaw[selected]=s.startYaw;
     status.textContent='足がぶつかるため着地できない。もう一度ドラッグしてね';
     return;
   }
-  if(!safePaint(f)){
-    showResult(false,'白線を踏み外した！ 道路をすり抜けて落下');
-    return;
-  }
+  // Unsupported feet do not cause instant death; balance and remaining support decide.
   progress=Math.max(progress,-Math.min(feet[0].z,feet[1].z));
-  selected=-1;dragStart=null;
+  bodyYaw=footYaw[selected];selected=-1;dragStart=null;
   if(!checkpointReached&&feet.every(p=>Math.abs(p.x-FAR_X)<.19&&p.z<CHECKPOINT_Z+.45)){
     checkpointReached=true;checkpointFeet=feet.map(p=>p.clone());
     document.getElementById('checkpointStatus').textContent='CHECKPOINT：到達済み';
@@ -379,11 +381,11 @@ renderer.domElement.addEventListener('pointermove',onPointerMove);
 renderer.domElement.addEventListener('pointerup',onPointerUp);
 renderer.domElement.addEventListener('pointercancel',e=>onPointerUp(e,true));
 document.getElementById('front').onclick=()=>{
-  if(ended)return;yaw=0;pitch=-.06;
+  if(ended)return;yaw=-bodyYaw;pitch=-.06;
   status.textContent=selected>=0?'足を選択中。足元に戻ると操作しやすいよ':'前方を確認中。ドラッグで自由に見回せる';
 };
 document.getElementById('down').onclick=()=>{
-  if(ended)return;yaw=0;pitch=-1.31;
+  if(ended)return;pitch=-1.31;
   status.textContent=selected>=0?'足をドラッグして着地させよう':'足をタップして選択しよう';
 };
 document.getElementById('reset').onclick=()=>reset(false);
@@ -426,14 +428,18 @@ function targetBalance(){
   const penaltyX=Math.max(0,lateral-.04)/(dragging?.29:.16)*28;
   const penaltyZ=Math.max(0,depth-.085)/(dragging?.26:.48)*29;
   const stride=Math.max(0,span-.57)*(dragging?43:30);
-  const crossed=feet[0].x>feet[1].x+.03?35:0;
+  const crossed=(feet[0].x-feet[1].x)*Math.cos(bodyYaw)-(feet[0].z-feet[1].z)*Math.sin(bodyYaw)>.12?20:0;
   const movement=dragging?dragSpeed*10+7:0;
   const leanPenalty=Math.max(0,Math.hypot(leanX,leanZ)-.5)*20;
-  return {target:clamp(100-penaltyX-penaltyZ-stride-crossed-movement-leanPenalty+wallAssist,0,100),comX,comZ};
+  const contact=feet.map((p,i)=>dragging&&i===selected?0:support(p,i));
+  const supportPenalty=Math.max(...contact)===0?120:contact.filter((v,i)=>!(dragging&&i===selected)).reduce((a,v)=>a+Math.max(0,.45-v)*55,0);
+  return {target:clamp(100-supportPenalty-impact-penaltyX-penaltyZ-stride-crossed-movement-leanPenalty+wallAssist,0,100),comX,comZ};
 }
 function updateBalance(dt){
   if(ended)return;
+  impact=Math.max(0,impact-dt*35);
   const state=targetBalance();
+  if(!feet.some((p,i)=>!(dragging&&i===selected)&&support(p,i)>0)){showResult(false,"足場を失った");return;}
   balance+=(state.target-balance)*Math.min(1,dt*(state.target>balance?7.6:5.8));
   if(balance<16)collapseTime+=dt*(wallAssist? .55:1);
   else collapseTime=Math.max(0,collapseTime-dt*2.5);
@@ -444,17 +450,16 @@ function updateBalance(dt){
     const planted=feet[1-selected],slip=dt*(32-balance)/32*.12;
     planted.x+=(state.comX-planted.x)*slip;
     planted.z+=(state.comZ-planted.z)*slip;
-    if(!safePaint(planted))showResult(false,'軸足が白線から滑り落ちた！');
+    
   }
 }
 function updateTraffic(dt){
   const phase=elapsed%30;
   pedestrianGreen=phase>=12&&phase<28;
   trafficGreen=phase<11;
-  pedRedLamp.emissiveIntensity=pedestrianGreen?.04:1.8;
-  pedBlueLamp.emissiveIntensity=pedestrianGreen?1.8:.04;
-  carRedLamp.emissiveIntensity=trafficGreen?.04:1.8;
-  carBlueLamp.emissiveIntensity=trafficGreen?1.8:.04;
+  const yellow=phase>=9&&phase<12;trafficGreen=phase<9;
+  for(const [r,g] of pedSignals){r.emissiveIntensity=pedestrianGreen?.04:2;g.emissiveIntensity=pedestrianGreen?2:.04;}
+  for(const [r,y,g] of carSignals){r.emissiveIntensity=!trafficGreen&&!yellow?2:.04;y.emissiveIntensity=yellow?2:.04;g.emissiveIntensity=trafficGreen?2:.04;}
   document.getElementById('pedText').textContent=pedestrianGreen?'青':'赤';
   document.getElementById('pedText').style.color=pedestrianGreen?'#74f4b3':'#ff7c7c';
   document.getElementById('carText').textContent=trafficGreen?'青':'赤';
@@ -463,16 +468,18 @@ function updateTraffic(dt){
   for(const car of cars){
     const next=car.z+car.dir*car.speed*dt;
     // Cars approach from opposite directions and stop BEFORE the crosswalk.
-    if(!trafficGreen&&car.dir<0&&car.z>=-4.78){
-      car.z=Math.max(-4.78,next);
-    }else if(!trafficGreen&&car.dir>0&&car.z<=-9.47){
-      car.z=Math.min(-9.47,next);
+    if(!trafficGreen&&car.dir<0&&car.z>=-3.55){
+      car.z=Math.max(-3.55,next);
+    }else if(!trafficGreen&&car.dir>0&&car.z<=-10.65){
+      car.z=Math.min(-10.65,next);
     }else car.z=next;
     if(car.dir<0&&car.z< -30)car.z=4.5;
     if(car.dir>0&&car.z>5.8)car.z=-30;
     car.root.position.set(car.x,0,car.z);
-    if(!ended&&Math.abs(body.x-car.x)<.78&&Math.abs(body.z-car.z)<1.07){
-      showResult(false,'車と接触した！ 信号を確認して横断しよう');
+    if(!ended&&Math.abs(body.x-car.x)<1.02&&Math.abs(body.z-car.z)<2.22){
+      const push=car.dir*Math.min(.12,dt*car.speed);impact=Math.min(85,impact+dt*95);
+      for(const f of feet)f.z+=push;
+      leanZ=clamp(leanZ+push*2,-.9,.9);
     }
   }
   checkpointMark.material.color.setHex(checkpointReached?0x78ffa6:0x47d9ee);
@@ -493,7 +500,7 @@ function animate(now){
   }
   const base=hip();
   torsoPivot.position.set(base.x,.94+fallOffset,base.z);
-  torsoPivot.rotation.set(leanZ*.92,0,-leanX*.92);
+  torsoPivot.rotation.set(leanZ*.92,bodyYaw,-leanX*.92);
   torsoPivot.updateMatrixWorld(true);
   const eyes=eyeAnchor.getWorldPosition(new THREE.Vector3());
   eyes.x=clamp(eyes.x,WALL_FACE+.2,FAR_WALL_FACE-.2);
@@ -507,9 +514,9 @@ function animate(now){
   // Keep legs attached to the feet and hips (including while falling).
   for(let i=0;i<2;i++){
     const foot=feet[i].clone();foot.y+=fallOffset;
-    footModels[i].root.position.copy(foot);
+    footModels[i].root.position.copy(foot);footModels[i].root.rotation.y=footYaw[i];
     const high=selected===i;
-    const suggested=selected<0&&!ended;
+    const suggested=false;
     const blocked=high&&feetCollide(feet[i],feet[1-i]);
     const color=blocked?0xff5c5c:high?0x45ddff:0x86f3a5;
     shoeMats[i].emissive.setHex(high?color:0);
@@ -532,6 +539,7 @@ function animate(now){
   document.getElementById('distance').textContent='進行距離 '+progress.toFixed(1)+'m / 26m';
   renderer.render(scene,camera);
 }
+document.addEventListener("contextmenu",e=>e.preventDefault());document.addEventListener("selectstart",e=>e.preventDefault());
 reset();
 requestAnimationFrame(animate);
 </script>
