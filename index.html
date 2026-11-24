@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>WHITE STEP | Prototype 0.6</title>
+<title>WHITE STEP | Prototype 0.9.6</title>
 <style>
 *{box-sizing:border-box;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent} html,body{touch-action:none;overscroll-behavior:none} #hint,#posture,#signalStatus,#checkpointStatus,#crosshair{display:none} #status{display:none}
 body{margin:0;overflow:hidden;background:#111822;color:#fff;font-family:system-ui,-apple-system,sans-serif}
@@ -38,11 +38,12 @@ h1 small{letter-spacing:0;font-size:10px;font-weight:500}
  #controls button{font-size:11px;padding:9px 8px}
  #status{bottom:11px;font-size:12px}
 }
+#navGuide{position:fixed;top:12px;left:50%;transform:translateX(-50%);pointer-events:none;text-align:center;color:#e7cf83;text-shadow:0 1px 4px #111;font-size:10px;opacity:.8;z-index:3}#navArrow{display:block;margin:auto;width:22px;height:24px;transform-origin:center}
 </style>
 </head>
 <body>
 <div id="hud">
-  <h1>WHITE STEP <small>Ver.0.9.5 DEBUG</small></h1>
+  <h1>WHITE STEP <small>Ver.0.9.6 DEBUG</small></h1>
   
   
   
@@ -51,6 +52,7 @@ h1 small{letter-spacing:0;font-size:10px;font-weight:500}
   <div id="checkpointStatus">CHECKPOINT：未到達</div>
   <div id="hint">左右どちらの足も自由に選べる<br>足をタップして選択、ドラッグで着地<br>同じ足を再タップで解除<br>足を持たずにドラッグ：視点移動<br>白線だけが足場</div>
 </div>
+<div id="navGuide"><svg id="navArrow" viewBox="0 0 24 24"><path d="M12 21V4 M6 10L12 4L18 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="navLabel">CHECKPOINT</span></div>
 <div id="controls">
   <button id="front" aria-label="前方に視点をリセット">前方を向く</button>
   <button id="down" aria-label="足元に視点をリセット">足元を見る</button>
@@ -71,7 +73,7 @@ function fail(e){failed=true;log('ERROR ['+stage+'] '+(e&&e.message?e.name+": "+
 window.wsDebug={mark:mark,fail:fail,low:low,frame:function(){frames++;if(frames===1)mark('First render OK');if(frames===60)log('60 frames OK');}};
 window.addEventListener('error',function(e){fail(e.error||e.message||('Resource error: '+(e.target.src||e.target.tagName)));},true);
 window.addEventListener('unhandledrejection',function(e){fail(e.reason);});
-log('White Step 0.9.5 DEBUG / '+(low?'LOW':'NORMAL'));log(navigator.userAgent);log('Screen '+innerWidth+'x'+innerHeight+' DPR '+devicePixelRatio);mark('Waiting for Three.js');
+log('White Step 0.9.6 DEBUG / '+(low?'LOW':'NORMAL'));log(navigator.userAgent);log('Screen '+innerWidth+'x'+innerHeight+' DPR '+devicePixelRatio);mark('Waiting for Three.js');
 setTimeout(function(){if(!frames&&!failed){log('TIMEOUT: no first render; last stage = '+stage);out.hidden=false;};},12000);
 document.getElementById('wsToggle').onclick=function(){out.hidden=!out.hidden;this.textContent=out.hidden?'ログを表示':'ログを隠す';};
 document.getElementById('wsCopy').onclick=async function(){try{await navigator.clipboard.writeText(lines.join('\n'));this.textContent='コピー済み';}catch(e){log('Copy failed: '+e.message);}};
@@ -278,7 +280,7 @@ const guideMat=new THREE.MeshBasicMaterial({color:0xe7cf83,depthTest:true,depthW
 for(let i=0;i<7;i++){const m=new THREE.Mesh(new THREE.BoxGeometry(.025,.008,.10),guideMat);m.position.z=-.16*i;routeGuide.add(m);}
 for(const sign of [-1,1]){const m=new THREE.Mesh(new THREE.BoxGeometry(.025,.008,.18),guideMat);m.position.set(sign*.065,0,-1.04);m.rotation.y=sign*.65;routeGuide.add(m);}
 routeGuide.traverse(m=>m.renderOrder=10);
-function routeYaw(p){return p.x>FAR_X-.30?0:(p.x>.30||p.z<CROSS_Z+.55?-Math.PI/2:0);}
+function routeYaw(p){return Math.atan2(p.x-FAR_X,p.z-(checkpointReached?GOAL_Z:CHECKPOINT_Z));}
 function hip(){
   if(rig){const t=rig.translation(),q=rig.rotation();return new THREE.Vector3(0,-.35,0).applyQuaternion(new THREE.Quaternion(q.x,q.y,q.z,q.w)).add(new THREE.Vector3(t.x,t.y,t.z));}
   return new THREE.Vector3((feet[0].x+feet[1].x)/2,1,(feet[0].z+feet[1].z)/2);
@@ -324,7 +326,7 @@ function beginRagdoll(){
 }
 function physicsStep(dt){
   const active=dragging&&!ended?selected:-1;
-  const good=feet.map((f,i)=>support(f,i)>=.72&&safePaint({x:f.x-.10*Math.sin(footYaw[i]),z:f.z-.10*Math.cos(footYaw[i])})&&f.y>=.035&&f.y<=.32);
+  const good=feet.map((f,i)=>(support(f,i)>=.70||heelSupported(f,i))&&f.y>=.035&&f.y<=.32);
   const t=rig.translation(),q=rig.rotation();
   const up=new THREE.Vector3(0,1,0).applyQuaternion(new THREE.Quaternion(q.x,q.y,q.z,q.w));
   const recover=up.y>.48&&t.y>.80;
@@ -408,6 +410,7 @@ function tappedFoot(e){
 // Collision uses the full footprint of the two shoes rather than center points.
 function shoeRect(p,angle){const c=Math.cos(angle),s=Math.sin(angle);return [[-.085,-.29],[.085,-.29],[.085,.085],[-.085,.085]].map(([x,z])=>({x:p.x+c*x+s*z,z:p.z-s*x+c*z}));}
 function feetCollide(a,b){const ia=feet.indexOf(a),ib=feet.indexOf(b);const aa=footYaw[ia<0?selected:ia]||0,bb=footYaw[ib<0?1-selected:ib]||0;const A=shoeRect(a,aa),B=shoeRect(b,bb);return [aa,aa+Math.PI/2,bb,bb+Math.PI/2].every(t=>{const proj=P=>P.map(p=>p.x*Math.cos(t)+p.z*Math.sin(t));const x=proj(A),y=proj(B);return Math.max(...x)>Math.min(...y)+.002&&Math.max(...y)>Math.min(...x)+.002;});}
+function heelSupported(p,i){const a=footYaw[i];return safePaint({x:p.x+.055*Math.sin(a),z:p.z+.055*Math.cos(a)});}
 function support(p,i){let n=0,total=0;const a=footYaw[i],c=Math.cos(a),s=Math.sin(a);for(let x=-.08;x<=.081;x+=.02)for(let z=-.28;z<=.081;z+=.02){total++;if(safePaint({x:p.x+c*x+s*z,z:p.z-s*x+c*z}))n++;}return n/total;}
 function resetSelection(){
   if(selected>=0){
@@ -560,6 +563,9 @@ function animate(now){
   }
   const base=hip();
   routeGuide.visible=!ended;const guidePos=feet[0].clone().add(feet[1]).multiplyScalar(.5);const guideYaw=routeYaw(guidePos);routeGuide.position.set(guidePos.x+.30*Math.cos(guideYaw),.045,guidePos.z-.30*Math.sin(guideYaw));routeGuide.rotation.y=guideYaw;
+  document.getElementById("navGuide").style.display=ended?"none":"";
+  document.getElementById("navArrow").style.transform=`rotate(${(-guideYaw-yaw)*180/Math.PI}deg)`;
+  document.getElementById("navLabel").textContent=checkpointReached?"OFFICE":"CHECKPOINT";
   torsoPivot.position.copy(base);
   const rq=rig.rotation();torsoPivot.quaternion.set(rq.x,rq.y,rq.z,rq.w);
   arms.forEach((a,i)=>{a.rotation.z=ended&&!isWin?(i?1:-1)*(1.6+.45*Math.sin(overlayDelay*15)):0;a.rotation.x=ended&&!isWin?.6*Math.sin(overlayDelay*12+i):0;});
