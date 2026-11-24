@@ -42,7 +42,7 @@ h1 small{letter-spacing:0;font-size:10px;font-weight:500}
 </head>
 <body>
 <div id="hud">
-  <h1>WHITE STEP <small>Ver.0.6</small></h1>
+  <h1>WHITE STEP <small>Ver.0.6 DEBUG</small></h1>
   <div>バランス <span id="balanceText">100%</span></div>
   <div id="bar"><div id="fill"></div></div>
   <div id="posture">重心：安定</div>
@@ -59,17 +59,42 @@ h1 small{letter-spacing:0;font-size:10px;font-weight:500}
 <div id="crosshair"></div>
 <div id="status">好きな足をタップして出勤開始！</div>
 <div id="message"><div id="panel"><h2 id="result">GAME OVER</h2><p id="reason"></p><button id="retry">RETRY</button></div></div>
+<style>#wsdebug{position:fixed;bottom:8px;left:8px;right:8px;z-index:1000;background:#101820ed;color:#fff;border:1px solid #718096;border-radius:8px;padding:8px;font:12px monospace;touch-action:pan-y}#wsdebug pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:34vh;overflow:auto;margin:6px 0;touch-action:pan-y}#wsdebug button{padding:5px 9px;font-size:12px}#wsdebug[hidden]{display:none}</style>
+<div id="wsdebug"><button id="wsToggle">ログを隠す</button> <button id="wsCopy">ログをコピー</button> <button id="wsLow">軽量モードで再起動</button><pre id="wsLog"></pre></div>
+<script>
+(function(){
+var lines=[],stage='HTML loaded',frames=0,failed=false,low=new URLSearchParams(location.search).get('low')==='1';
+var out=document.getElementById('wsLog');
+function log(t){lines.push(t);out.textContent=lines.join('\n');out.scrollTop=out.scrollHeight;}
+function mark(t){stage=t;log(t);}
+function fail(e){failed=true;log('ERROR ['+stage+'] '+(e&&e.stack||e&&e.message||String(e)));document.getElementById('wsdebug').hidden=false;out.hidden=false;}
+window.wsDebug={mark:mark,fail:fail,low:low,frame:function(){frames++;if(frames===1)mark('First render OK');if(frames===60)log('60 frames OK');}};
+window.addEventListener('error',function(e){fail(e.error||e.message||('Resource error: '+(e.target.src||e.target.tagName)));},true);
+window.addEventListener('unhandledrejection',function(e){fail(e.reason);});
+log('White Step 0.6 DEBUG / '+(low?'LOW':'NORMAL'));log(navigator.userAgent);log('Screen '+innerWidth+'x'+innerHeight+' DPR '+devicePixelRatio);mark('Waiting for Three.js');
+setTimeout(function(){if(!frames&&!failed)log('TIMEOUT: no first render; last stage = '+stage);},12000);
+document.getElementById('wsToggle').onclick=function(){out.hidden=!out.hidden;this.textContent=out.hidden?'ログを表示':'ログを隠す';};
+document.getElementById('wsCopy').onclick=async function(){try{await navigator.clipboard.writeText(lines.join('\n'));this.textContent='コピー済み';}catch(e){log('Copy failed: '+e.message);}};
+document.getElementById('wsLow').onclick=function(){var u=new URL(location.href);u.searchParams.set('low',low?'0':'1');location.href=u.href;};
+})();
+</script>
 <script type="module">
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js';
+const D=window.wsDebug;
+async function boot(){
+const THREE=await import('https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js');
+D.mark('Three.js loaded r'+THREE.REVISION);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xa9c4d1);
 scene.fog = new THREE.Fog(0xa9c4d1,22,85);
 const camera = new THREE.PerspectiveCamera(74,innerWidth/innerHeight,.045,125);
-const renderer = new THREE.WebGLRenderer({antialias:true});
-renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+D.mark("Creating WebGL renderer");
+const renderer = new THREE.WebGLRenderer({antialias:!D.low});
+D.mark("WebGL renderer OK: "+renderer.getContext().getParameter(renderer.getContext().VERSION));
+renderer.domElement.addEventListener("webglcontextlost",()=>D.fail("WebGL context lost"));
+renderer.setPixelRatio(D.low?1:Math.min(devicePixelRatio,2));
 renderer.setSize(innerWidth,innerHeight);
-renderer.shadowMap.enabled=true;
+renderer.shadowMap.enabled=!D.low;
 document.body.prepend(renderer.domElement);
 
 scene.add(new THREE.HemisphereLight(0xf1f6ff,0x657082,2.1));
@@ -120,6 +145,7 @@ block(4.35,7,5.5,office,7.48,3.48,-27.1,true);
 for(let floor=0;floor<4;floor++){
   block(.07,.87,2.5,windowMat,5.28,1.15+floor*1.48,-27.1);
 }
+D.mark('Road and houses built');
 const signCanvas=document.createElement('canvas');
 signCanvas.width=512;signCanvas.height=128;
 const signCtx=signCanvas.getContext('2d');
@@ -153,6 +179,7 @@ function signal(x,z,angle,ped){
  part(ped?.32:.92,ped?.58:.32,.22,offset,h,0,black);
  return (ped?[0xff2525,0x27ed85]:[0xff2525,0xffc42b,0x27ed85]).map((c,i)=>{const m=new THREE.MeshStandardMaterial({color:0x303030,emissive:c,emissiveIntensity:.04});const o=new THREE.Mesh(new THREE.SphereGeometry(.105,16,12),m);o.position.set(offset+(ped?0:(1-i)*.28),h+(ped?(.14-i*.28):0),.13);group.add(o);return m;});
 }
+D.mark('Office and checkpoint built');
 const pedSignals=[signal(4.65,CROSS_Z,-Math.PI/2,true),signal(-.40,CROSS_Z,Math.PI/2,true)];
 const carSignals=[signal(-.42,-8.65,0,false),signal(4.67,-5.55,Math.PI,false)];
 function makeCar(x,z,hex,dir,speed){
@@ -171,6 +198,7 @@ function makeCar(x,z,hex,dir,speed){
 }
 const cars=[makeCar(1.13,3.4,0xc74b42,-1,2.4),makeCar(3.12,-29,0x476fbb,1,2.1)];
 // Two solid, separately hittable shoes. Height differences allow one foot to swing over another.
+D.mark('Traffic built');
 const footModels=[],shoeMats=[];
 for(let i=0;i<2;i++){
   const foot=new THREE.Group();
@@ -230,6 +258,7 @@ headGroup.add(eyeAnchor);
 // Don't draw the player's own head/neck into the eye camera: it would obscure vision.
 neck.layers.set(1);headMesh.layers.set(1);hair.layers.set(1);
 
+D.mark('Player model built');
 const clamp=(n,min,max)=>Math.max(min,Math.min(max,n));
 const ray=new THREE.Raycaster(),pointer=new THREE.Vector2();
 const plane=new THREE.Plane(new THREE.Vector3(0,1,0),0);
@@ -486,7 +515,7 @@ function updateTraffic(dt){
   checkpointMark.rotation.z+=dt*.5;
 }
 function animate(now){
-  requestAnimationFrame(animate);
+ try {
   const dt=clamp((now-lastFrame)/1000||1/60,.001,.05);
   lastFrame=now;elapsed+=dt;
   dragSpeed*=Math.pow(.79,dt*60);
@@ -538,10 +567,17 @@ function animate(now){
   document.getElementById('posture').textContent=wallAssist>0?'重心：壁に接触中':p>75?'重心：安定':p>35?'重心：不安定':'重心：転倒の危険！';
   document.getElementById('distance').textContent='進行距離 '+progress.toFixed(1)+'m / 26m';
   renderer.render(scene,camera);
+  D.frame();
+  requestAnimationFrame(animate);
+ } catch(e){D.fail(e);}
 }
 document.addEventListener("contextmenu",e=>e.preventDefault());document.addEventListener("selectstart",e=>e.preventDefault());
+D.mark('Starting reset');
 reset();
+D.mark("Reset OK; waiting for first frame");
 requestAnimationFrame(animate);
+}
+boot().catch(e=>D.fail(e));
 </script>
 </body>
 </html>
