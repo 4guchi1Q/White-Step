@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>WHITE STEP | Prototype 0.10</title>
+<title>WHITE STEP | Prototype 0.11</title>
 <style>
 *{box-sizing:border-box;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent} html,body{touch-action:none;overscroll-behavior:none} #hint,#posture,#signalStatus,#checkpointStatus,#crosshair{display:none} #status{display:none}
 body{margin:0;overflow:hidden;background:#111822;color:#fff;font-family:system-ui,-apple-system,sans-serif}
@@ -43,7 +43,7 @@ h1 small{letter-spacing:0;font-size:10px;font-weight:500}
 </head>
 <body>
 <div id="hud">
-  <h1>WHITE STEP <small>Ver.0.10 DEBUG</small></h1>
+  <h1>WHITE STEP <small>Ver.0.11 DEBUG</small></h1>
   
   
   
@@ -74,7 +74,7 @@ function fail(e){failed=true;log('ERROR ['+stage+'] '+(e&&e.message?e.name+": "+
 window.wsDebug={mark:mark,fail:fail,low:low,frame:function(){frames++;if(frames===1)mark('First render OK');if(frames===60)log('60 frames OK');}};
 window.addEventListener('error',function(e){fail(e.error||e.message||('Resource error: '+(e.target.src||e.target.tagName)));},true);
 window.addEventListener('unhandledrejection',function(e){fail(e.reason);});
-log('White Step 0.10 DEBUG / '+(low?'LOW':'NORMAL'));log(navigator.userAgent);log('Screen '+innerWidth+'x'+innerHeight+' DPR '+devicePixelRatio);mark('Waiting for Three.js');
+log('White Step 0.11 DEBUG / '+(low?'LOW':'NORMAL'));log(navigator.userAgent);log('Screen '+innerWidth+'x'+innerHeight+' DPR '+devicePixelRatio);mark('Waiting for Three.js');
 setTimeout(function(){if(!frames&&!failed){log('TIMEOUT: no first render; last stage = '+stage);out.hidden=false;};},12000);
 document.getElementById('wsToggle').onclick=function(){out.hidden=!out.hidden;this.textContent=out.hidden?'ログを表示':'ログを隠す';};
 document.getElementById('wsCopy').onclick=async function(){try{await navigator.clipboard.writeText(lines.join('\n'));this.textContent='コピー済み';}catch(e){log('Copy failed: '+e.message);}};
@@ -125,15 +125,28 @@ function block(w,h,d,mat,x,y,z,cast=false){
 const STRIPE_HALF=.075, FAR_X=4.85, WALL_FACE=-1.65, FAR_WALL_FACE=6.50;
 const CROSS_Z=-7.1,CROSS_HALF_Z=.76,CROSS_XS=[.97,1.94,2.91,3.88];
 const CHECKPOINT_Z=-12.4,GOAL_Z=-48.0;
+const junctionZ=-30.5, gapA=-32.8,gapB=-28.2;
+const paintRects=[];
+function paintRect(x,z,w,d){paintRects.push({x,z,w,d});block(w,.32,d,stripe,x,-.136,z);}
+// Rasterize Japanese road lettering into matching visible and solid strips.
+const lettering=document.createElement('canvas');lettering.width=48;lettering.height=48;
+const lc=lettering.getContext('2d');
+for(const [k,ch] of [...'止まれ'].entries()){
+ lc.clearRect(0,0,48,48);lc.fillStyle='white';lc.font='bold 44px sans-serif';lc.textAlign='center';lc.textBaseline='middle';lc.fillText(ch,24,24);
+ const pix=lc.getImageData(0,0,48,48).data;const cell=.018;
+ for(let y=0;y<48;y+=3){let start=-1;for(let x=0;x<=48;x+=3){const on=x<48&&pix[((y+1)*48+x+1)*4+3]>100;if(on&&start<0)start=x;if(!on&&start>=0){paintRect(FAR_X+(start+x-48)*cell/2,-28.85-k*1.05+(y-24)*cell,(x-start)*cell,3*cell);start=-1;}}}
+}
+paintRect(FAR_X,-32.25,1.05,.22);paintRect(FAR_X,-32.65,.15,.35);paintRect(FAR_X,-28.35,.15,.35);
 function safePaint(p){
   const nearLine=Math.abs(p.x)<=STRIPE_HALF&&p.z>=-56&&p.z<=5;
-  const farLine=Math.abs(p.x-FAR_X)<=STRIPE_HALF&&p.z<=5&&p.z>=-56;
+  const farLine=Math.abs(p.x-FAR_X)<=STRIPE_HALF&&p.z<=5&&p.z>=-56&&(p.z<=gapA||p.z>=gapB);
   const crosswalk=Math.abs(p.z-CROSS_Z)<=CROSS_HALF_Z&&CROSS_XS.some(x=>Math.abs(p.x-x)<=.225);
-  return nearLine||farLine||crosswalk;
+  return nearLine||farLine||crosswalk||paintRects.some(r=>Math.abs(p.x-r.x)<=r.w/2&&Math.abs(p.z-r.z)<=r.d/2);
 }
 block(8.15,.06,61,asphalt,2.425,-.064,-25.5);
 block(.15,.32,61,stripe,0,-.136,-25.5);
-block(.15,.32,61,stripe,FAR_X,-.136,-25.5);
+for(const [a,b] of [[-56,gapA],[gapB,5]])block(.15,.32,b-a,stripe,FAR_X,-.136,(a+b)/2);
+block(9,.06,5.2,asphalt,10.5,-.064,junctionZ);block(3,3.5,5.2,concrete,15.3,1.7,junctionZ);
 for(const x of CROSS_XS)block(.45,.32,CROSS_HALF_Z*2,stripe,x,-.136,CROSS_Z);
 
 for(let i=0;i<11;i++){
@@ -143,6 +156,7 @@ for(let i=0;i<11;i++){
   block(.22,1.43,5.4,i%3?concrete:darkWall,-1.76,.71,z,true);
   block(3.1,height,4.75,houseMat,-3.52,height/2-.05,z,true);
   block(.09,.64,.92,windowMat,-1.95,1.3,z-.85);
+  if(i===6)continue;
   block(.22,1.35,5.4,concrete,6.61,.67,z,true);
   block(3.2,4.15,4.7,material(i%2?0xc7b8ab:0xa6b5bb),8.52,2.02,z,true);
   block(.09,.65,.92,windowMat,6.91,1.4,z+.6);
@@ -206,17 +220,21 @@ function makeCar(x,z,hex,dir,speed){
 }
 const cars=[];
 const walkers=[];let bumpCooldown=0,bump=null;
-for(let i=0;i<4;i++){
+for(let i=0;i<2;i++){
  const root=new THREE.Group();scene.add(root);const coat=material([0x927d68,0x48657a,0x71816b,0x76617b][i]);
  function part(w,h,d,m,x,y,z,parent=root){const a=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);a.position.set(x,y,z);parent.add(a);return a;}
  part(.38,.56,.24,coat,0,1.22,0);const head=new THREE.Mesh(new THREE.SphereGeometry(.13,10,8),skin);head.position.y=1.65;root.add(head);
  const legs=[],hands=[];for(const side of [-1,1]){const l=new THREE.Group();l.position.set(side*.10,.94,0);root.add(l);part(.14,.75,.15,trousers,0,-.38,0,l);part(.15,.12,.25,black,0,-.79,-.045,l);legs.push(l);const a=new THREE.Group();a.position.set(side*.25,1.43,0);root.add(a);part(.11,.51,.12,coat,0,-.24,0,a);hands.push(a);}
- const origin=-18-i*7,dir=i%2? -1:1;walkers.push({root,legs,hands,origin,z:origin,dir,speed:.85+i*.12,x:FAR_X+(i%2?.12:-.12)});
+ const path=i===0?[[13,-30.5],[5.35,-30.5],[5.35,-18],[6.0,-18],[6.0,-30.5],[13,-30.5]]:[[13,-30.9],[5.42,-30.9],[5.42,-44],[6.05,-44],[6.05,-30.9],[13,-30.9]];
+ walkers.push({root,legs,hands,path,index:1,x:path[0][0],z:path[0][1],speed:.85+i*.12,wait:i*12});
 }
 function updateWalkers(dt){
  bumpCooldown=Math.max(0,bumpCooldown-dt);const p=rig.translation();
- for(const w of walkers){w.z+=w.dir*w.speed*dt;if(w.z>-15)w.z=-45;if(w.z< -45)w.z=-15;w.root.position.set(w.x,0,w.z);w.root.rotation.y=w.dir>0?Math.PI:0;w.legs.forEach((l,i)=>{l.rotation.x=Math.sin(elapsed*7+i*Math.PI)*.36;w.hands[i].rotation.x=-l.rotation.x*.7;});
- if(!ended&&p.y>.5&&Math.abs(p.x-w.x)<.40&&Math.abs(p.z-w.z)<.40&&bumpCooldown===0){bumpCooldown=1.5;bump={x:p.x>=w.x?1:-1,z:w.dir};status.textContent='歩行者にぶつかった！ 踏み直そう';}
+ for(const w of walkers){if(w.wait>0){w.wait-=dt;continue;}const target=w.path[w.index],dx=target[0]-w.x,dz=target[1]-w.z,d=Math.hypot(dx,dz),step=w.speed*dt;
+ if(d<=step){w.x=target[0];w.z=target[1];w.index=(w.index+1)%w.path.length;}else{w.x+=dx/d*step;w.z+=dz/d*step;w.root.rotation.y=Math.atan2(-dx,-dz);}
+ w.root.position.set(w.x,0,w.z);w.legs.forEach((l,i)=>{l.rotation.x=Math.sin(elapsed*7+i*Math.PI)*.36;w.hands[i].rotation.x=-l.rotation.x*.7;});
+ const footHit=feet.some(f=>Math.abs(f.x-w.x)<.31&&Math.abs(f.z-w.z)<.32);
+ if(!ended&&p.y>.5&&(footHit||(Math.abs(p.x-w.x)<.48&&Math.abs(p.z-w.z)<.38))&&bumpCooldown===0){bumpCooldown=1.5;bump={x:p.x>=w.x?1:-1,z:Math.sign(dz)};status.textContent='歩行者にぶつかった！ 踏み直そう';}
  }
 }
 // Two solid, separately hittable shoes. Height differences allow one foot to swing over another.
@@ -304,9 +322,9 @@ function initPhysics(){
   if(world)world.free();
   ropes=[];fallLegs=[];world=new R.World({x:0,y:-9.81,z:0});world.timestep=1/120;accumulator=0;held=-1;
   const fixed=(x,y,z,w,h,d)=>world.createCollider(R.ColliderDesc.cuboid(w/2,h/2,d/2).setTranslation(x,y,z).setFriction(.85));
-  fixed(0,-.136,-25.5,.15,.32,61);fixed(FAR_X,-.136,-25.5,.15,.32,61);
+  fixed(0,-.136,-25.5,.15,.32,61);for(const [a,b] of [[-56,gapA],[gapB,5]])fixed(FAR_X,-.136,(a+b)/2,.15,.32,b-a);for(const r of paintRects)fixed(r.x,-.136,r.z,r.w,.32,r.d);
   for(const x of CROSS_XS)fixed(x,-.136,CROSS_Z,.45,.32,CROSS_HALF_Z*2);
-  for(let i=0;i<11;i++){const z=1.5-i*5.5;fixed(-1.76,.71,z,.22,1.43,5.4);fixed(6.61,.67,z,.22,1.35,5.4);}
+  for(let i=0;i<11;i++){const z=1.5-i*5.5;fixed(-1.76,.71,z,.22,1.43,5.4);if(i!==6)fixed(6.61,.67,z,.22,1.35,5.4);}
   shoeBodies=feet.map((f,i)=>{const b=world.createRigidBody(R.RigidBodyDesc.dynamic().setTranslation(f.x,.09,f.z).setLinearDamping(1.8).setAngularDamping(8).setCcdEnabled(true));world.createCollider(R.ColliderDesc.cuboid(.065,.055,.15).setTranslation(0,0,-.065).setMass(12).setFriction(1.6),b);return b;});
   const x=(feet[0].x+feet[1].x)/2,z=(feet[0].z+feet[1].z)/2-.08;
   rig=world.createRigidBody(R.RigidBodyDesc.dynamic().setTranslation(x,1.48,z-.025).setLinearDamping(2.5).setAngularDamping(8).setCcdEnabled(true));
@@ -388,7 +406,7 @@ function reset(fromCheckpoint=false){
   balance=100;collapseTime=0;fallOffset=0;fallVelocity=0;ended=false;isWin=false;overlayDelay=0;
   progress=Math.max(0,-Math.min(feet[0].z,feet[1].z));
   leanX=0;leanZ=0;wallContactTime=0;wallAssist=0;elapsed=0;
-  bump=null;bumpCooldown=0;for(const w of walkers){w.z=w.origin;w.root.position.set(w.x,0,w.z);}
+  bump=null;bumpCooldown=0;for(const [i,w] of walkers.entries()){w.index=1;[w.x,w.z]=w.path[0];w.wait=i*12;w.root.position.set(w.x,0,w.z);}
   for(const car of cars){car.z=car.origin;car.root.position.z=car.z}
   document.getElementById('checkpointStatus').textContent='CHECKPOINT：'+(checkpointReached?'到達済み':'未到達');
   initPhysics();mode="stable";unstableAge=0;yaw=0;pitch=-1.31;initialFrame=true;lastFrame=performance.now();
