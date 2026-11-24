@@ -42,7 +42,7 @@ h1 small{letter-spacing:0;font-size:10px;font-weight:500}
 </head>
 <body>
 <div id="hud">
-  <h1>WHITE STEP <small>Ver.0.9.4 DEBUG</small></h1>
+  <h1>WHITE STEP <small>Ver.0.9.5 DEBUG</small></h1>
   
   
   
@@ -71,7 +71,7 @@ function fail(e){failed=true;log('ERROR ['+stage+'] '+(e&&e.message?e.name+": "+
 window.wsDebug={mark:mark,fail:fail,low:low,frame:function(){frames++;if(frames===1)mark('First render OK');if(frames===60)log('60 frames OK');}};
 window.addEventListener('error',function(e){fail(e.error||e.message||('Resource error: '+(e.target.src||e.target.tagName)));},true);
 window.addEventListener('unhandledrejection',function(e){fail(e.reason);});
-log('White Step 0.9.4 DEBUG / '+(low?'LOW':'NORMAL'));log(navigator.userAgent);log('Screen '+innerWidth+'x'+innerHeight+' DPR '+devicePixelRatio);mark('Waiting for Three.js');
+log('White Step 0.9.5 DEBUG / '+(low?'LOW':'NORMAL'));log(navigator.userAgent);log('Screen '+innerWidth+'x'+innerHeight+' DPR '+devicePixelRatio);mark('Waiting for Three.js');
 setTimeout(function(){if(!frames&&!failed){log('TIMEOUT: no first render; last stage = '+stage);out.hidden=false;};},12000);
 document.getElementById('wsToggle').onclick=function(){out.hidden=!out.hidden;this.textContent=out.hidden?'ログを表示':'ログを隠す';};
 document.getElementById('wsCopy').onclick=async function(){try{await navigator.clipboard.writeText(lines.join('\n'));this.textContent='コピー済み';}catch(e){log('Copy failed: '+e.message);}};
@@ -274,9 +274,9 @@ let footV,fallX,fallZ,fallVX,fallVZ,fallRoll,fallSpin;
 let checkpointReached=false,checkpointFeet=null,pedestrianGreen=false,trafficGreen=true;
 let yaw=0,pitch=-1.31,lastFrame=performance.now(),elapsed=0,initialFrame=true;
 const routeGuide=new THREE.Group();scene.add(routeGuide);
-const guideMat=new THREE.MeshBasicMaterial({color:0xffd34e,depthTest:false,transparent:true,opacity:.9});
-for(let i=0;i<7;i++){const m=new THREE.Mesh(new THREE.BoxGeometry(.045,.008,.12),guideMat);m.position.z=-.16*i;routeGuide.add(m);}
-for(const sign of [-1,1]){const m=new THREE.Mesh(new THREE.BoxGeometry(.045,.008,.22),guideMat);m.position.set(sign*.065,0,-1.04);m.rotation.y=sign*.65;routeGuide.add(m);}
+const guideMat=new THREE.MeshBasicMaterial({color:0xe7cf83,depthTest:true,depthWrite:false,transparent:true,opacity:.42});
+for(let i=0;i<7;i++){const m=new THREE.Mesh(new THREE.BoxGeometry(.025,.008,.10),guideMat);m.position.z=-.16*i;routeGuide.add(m);}
+for(const sign of [-1,1]){const m=new THREE.Mesh(new THREE.BoxGeometry(.025,.008,.18),guideMat);m.position.set(sign*.065,0,-1.04);m.rotation.y=sign*.65;routeGuide.add(m);}
 routeGuide.traverse(m=>m.renderOrder=10);
 function routeYaw(p){return p.x>FAR_X-.30?0:(p.x>.30||p.z<CROSS_Z+.55?-Math.PI/2:0);}
 function hip(){
@@ -446,7 +446,12 @@ function onPointerMove(e){
   const offX=wantedX-anchor.x,offZ=wantedZ-anchor.z;
   const reach=Math.min(1,1.08/Math.max(.001,Math.hypot(offX,offZ)));
   feet[selected].set(anchor.x+offX*reach,.30,anchor.z+offZ*reach);
-  footYaw[selected]=routeYaw(feet[selected]);
+  const moveX=feet[selected].x-start.x,moveZ=feet[selected].z-start.z;
+  if(Math.hypot(moveX,moveZ)>.045){
+    const targetYaw=Math.atan2(-moveX,-moveZ);
+    const delta=Math.atan2(Math.sin(targetYaw-footYaw[selected]),Math.cos(targetYaw-footYaw[selected]));
+    footYaw[selected]+=delta*.32;
+  }else footYaw[selected]=session.startYaw;
   dragSpeed=clamp(dragSpeed*.55+Math.hypot(dx,dy)/95,0,1.8);
   if(feetCollide(feet[selected],anchor)){
     status.textContent='足同士が重なっている！ この位置には着地できない';
@@ -473,6 +478,9 @@ function onPointerUp(e,cancel=false){
   }
   const f=feet[selected],anchor=feet[1-selected];
   dragging=false;f.y=.09;footV[selected]=0;dragSpeed*=.3;
+  const moveX=f.x-s.startFoot.x,moveZ=f.z-s.startFoot.z;
+  if(Math.hypot(moveX,moveZ)>.045)footYaw[selected]=Math.atan2(-moveX,-moveZ);
+  else footYaw[selected]=s.startYaw;
   if(feetCollide(f,anchor)){
     f.copy(s.startFoot);footYaw[selected]=s.startYaw;
     status.textContent='足がぶつかるため着地できない。もう一度ドラッグしてね';
@@ -551,7 +559,7 @@ function animate(now){
     if(overlayDelay>(isWin?.85:2.0))document.getElementById('message').style.display='flex';
   }
   const base=hip();
-  routeGuide.visible=!ended;const guidePos=feet[0].clone().add(feet[1]).multiplyScalar(.5);routeGuide.position.set(guidePos.x,.045,guidePos.z);routeGuide.rotation.y=routeYaw(guidePos);
+  routeGuide.visible=!ended;const guidePos=feet[0].clone().add(feet[1]).multiplyScalar(.5);const guideYaw=routeYaw(guidePos);routeGuide.position.set(guidePos.x+.30*Math.cos(guideYaw),.045,guidePos.z-.30*Math.sin(guideYaw));routeGuide.rotation.y=guideYaw;
   torsoPivot.position.copy(base);
   const rq=rig.rotation();torsoPivot.quaternion.set(rq.x,rq.y,rq.z,rq.w);
   arms.forEach((a,i)=>{a.rotation.z=ended&&!isWin?(i?1:-1)*(1.6+.45*Math.sin(overlayDelay*15)):0;a.rotation.x=ended&&!isWin?.6*Math.sin(overlayDelay*12+i):0;});
